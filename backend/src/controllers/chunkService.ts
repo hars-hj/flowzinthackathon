@@ -1,0 +1,43 @@
+import { MarkdownTextSplitter } from "@langchain/textsplitters";
+
+type Chunk = {
+  content: string;
+  metadata: {
+    filename: string;
+    chunkIndex: number;
+    page: number;
+  };
+};
+
+type Page = {
+  page: number;
+  markdown: string;
+};
+
+export async function chunkMarkdown(
+  filename: string,
+  pages: Page[]
+): Promise<Chunk[]> {
+  const splitter = new MarkdownTextSplitter({
+    chunkSize: 1000,
+    chunkOverlap: 150,
+  });
+
+  const texts = pages.map((p) => p.markdown);
+
+  const metadatas = pages.map((p) => ({
+    filename,
+    page: p.page,
+  }));
+
+  const docs = await splitter.createDocuments(texts, metadatas);
+
+  return docs.map((doc, index) => ({
+    content: doc.pageContent,
+    metadata: {
+      filename,
+      chunkIndex: index,
+      page: doc.metadata.page,
+    },
+  }));
+}

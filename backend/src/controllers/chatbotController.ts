@@ -1,6 +1,6 @@
 import Groq from 'groq-sdk';
 import type { Request, Response } from 'express';
-import { supabase } from '../lib/supabaseClient.ts';
+import { supabase } from '../../lib/supabaseClient.js';
 
 const GROQ_API_URL = process.env.GROQ_API_URL;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;

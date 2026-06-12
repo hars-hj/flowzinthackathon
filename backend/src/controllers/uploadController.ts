@@ -2,8 +2,9 @@ import express from "express";
 import multer from "multer";
 import axios from "axios";
 import FormData from "form-data";
-import {chunkMarkdown} from "./chunkService.ts";
-import { embedChunks } from "./embeddingService.ts";
+import {chunkMarkdown} from "./chunkService.js";
+import { embedChunks } from "./embeddingService.js";
+import { storeEmbeddings } from "./embeddingToDb.js";
 
  async function uploadFile(req: express.Request, res: express.Response) {
         try {
@@ -32,19 +33,24 @@ import { embedChunks } from "./embeddingService.ts";
             );
 
             // create chunks from markdown
-            const markdown = response.data.markdown;
+            const pages = response.data.pages;
             const filename = response.data.filename;
-            const chunks = await chunkMarkdown(filename, markdown);
-            
+
+            // create chunks from markdown
+             const chunks = await chunkMarkdown(filename, pages);
 
             // create embeddings for chunks
             const embeddings = await embedChunks(chunks);
            
-            return res.json({
+            
+            // store chunks and embeddings in database
+            
+            const data = await storeEmbeddings(embeddings);
+            
+            return res.status(200).json({
+                message: "File uploaded and processed successfully",
                
-                embeddings: embeddings
             });
-
         } catch (err) {
             console.error(err);
 

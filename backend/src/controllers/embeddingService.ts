@@ -9,6 +9,7 @@ type Chunk = {
     metadata: {
         filename: string;
         chunkIndex: number;
+        page: number;
     };
 };
 

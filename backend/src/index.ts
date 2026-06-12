@@ -1,7 +1,7 @@
 import express from 'express';
 import type { Request, Response } from 'express';
-import chatRoutes from './routes/chatRoutes.ts';
-import uploadRouter from './routes/uploadFile.ts';
+import chatRoutes from './routes/chatRoutes.js';
+import uploadRouter from './routes/uploadFile.js';
 const app = express();
 const port = process.env.PORT || 4000;
 

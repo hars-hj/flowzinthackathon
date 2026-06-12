@@ -24,3 +24,38 @@
 - Add sentiment analysis and escalation detection during message storage.
 - Add validation and error handling for Supabase inserts and response extraction.
 - Add unit tests for the chat flow and Supabase conversation retrieval.
+
+Frontend
+    │
+    │ Upload PDF/DOCX
+    ▼
+Node Backend (Express + Multer)
+    │
+    │ forwards file
+    ▼
+Python Parser Service (FastAPI)
+    │
+    │ Extract Markdown
+    ▼
+Node Backend
+    │
+    │ Chunk Markdown
+    ▼
+Embedding Service (Gemini)
+    │
+    │ Generate vectors
+    ▼
+database.
+
+use /api/uploadFile to access the embegging pipeline.
+
+
+Implemented a separate Python parser service for document extraction while keeping the main backend in Node.js (Express).
+Frontend uploads PDF/DOCX files to the Node backend, which forwards the file to the Python service using multipart/form-data.
+Python service extracts the document into Markdown and returns a JSON response containing:
+filename
+markdown
+Node backend receives the Markdown and splits it into semantic chunks using a Markdown-aware text splitter with overlap for better retrieval quality.
+Each chunk is associated with basic metadata (filename, chunkIndex) for future source attribution and document management.
+Chunks are then passed to the Google Gemini Embedding model to generate vector embeddings.
+The next step is to store {content, embedding, metadata} in databse and integrate retrieval into the chatbot pipeline.
