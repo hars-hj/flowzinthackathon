@@ -1,19 +1,27 @@
-from time import time
-
-from fastapi import FastAPI, UploadFile
+from fastapi import UploadFile
 import fitz
 import pymupdf4llm
 
-async def parse_pdf(file:UploadFile):
-   # print(f"PDF loaded in {time() :.2f} seconds")
+async def parse_pdf(file: UploadFile):
     pdf_bytes = await file.read()
-   
+
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-    #print(f"PDF loaded in {time() :.2f} seconds")
-    markdown = pymupdf4llm.to_markdown(doc)
-   # print(f"PDF parsed in {time() :.2f} seconds")
-    doc.close()
+
+    pages = []
+
+    for i in range(doc.page_count):
+        md = pymupdf4llm.to_markdown(
+            fitz.open(stream=pdf_bytes, filetype="pdf"),
+            pages=[i]
+        )
+
+        pages.append({
+            "page": i + 1,
+            "markdown": md
+        })
+       
+        
     return {
-        "filename": file.filename,
-        "markdown": markdown
-    }
+            "filename": file.filename,
+            "pages": pages
+            }

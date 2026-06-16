@@ -31,7 +31,7 @@ interface Chunk {
 }
 
 //  Embed the user's question 
-async function embedQuery(question: string): Promise<number[]> {
+export async function embedQuery(question: string): Promise<number[]> {
   const result = await embeddingsModel.models.embedContent({
     model: "gemini-embedding-001",
     contents: question,
@@ -49,7 +49,7 @@ async function embedQuery(question: string): Promise<number[]> {
 }
 
 //  Search for relevant chunks 
-async function retrieveChunks(queryEmbedding: number[]): Promise<Chunk[]> {
+export async function retrieveChunks(queryEmbedding: number[]): Promise<Chunk[]> {
   const { data, error } = await supabase.rpc("match_chunks", {
     query_embedding: queryEmbedding,
     match_count: 5,
@@ -92,8 +92,16 @@ async function generateAnswer(
     .join("\n\n---\n\n");
 
   const systemPrompt = `You are a helpful sales support assistant for our company.
-Answer questions using ONLY the provided company information below.
-If the answer is not in the provided context, say "I don't have that information, please contact our sales team."
+
+STRICT RULES — follow these exactly, no exceptions:
+1. Answer ONLY using the COMPANY INFORMATION provided below. Never add information from outside it.
+2. If the context gives a clear condition (e.g. "within 14 days"), treat it as a hard cutoff. Do NOT speculate about what might happen outside that condition.
+3. If a situation falls outside what the context covers, say: "I don't have that detail — please contact our team at support@nexasupport.ai"
+4. Never use phrases like "may be eligible", "might", "could potentially" unless those exact words appear in the source. Hedging language invents uncertainty that may not exist.
+5. If the answer is simply "no" — say no clearly and explain why, then stop.
+6. Never contradict yourself within a single answer.
+
+7.if the answer is not in the provided context, say "I don't have that information, please contact our sales team."
 Be concise, professional, and helpful.
 
 COMPANY INFORMATION:
@@ -109,7 +117,7 @@ ${context}`;
     model: "llama-3.3-70b-versatile",
     messages,
     max_tokens: 1024,
-    temperature: 0.3, // lower = more factual, less creative
+    temperature: 0.1, // lower = more factual, less creative
   });
 
   return response.choices[0].message.content ?? "Sorry, I could not generate a response.";

@@ -5,13 +5,14 @@ import { chat } from './ragService.js';
 
  // chat handler to be used in router
 export async function chatHandler(req: any,res:any):Promise<void> {
-    const { sessionId, question } = req.body;
-    if (!sessionId || !question) {
-        res.status(400).json({ error: "Missing sessionId or question in request body" });
+    const { sessionId, message, question } = req.body;
+    const userMessage = message ?? question;
+    if (!sessionId || !userMessage) {
+        res.status(400).json({ error: "Missing sessionId or message in request body" });
         return;
     }
     try{
-        const reply = await chat(sessionId,question);
+        const reply = await chat(sessionId, userMessage);
         res.json({"reply" : reply});
 
     } catch (error) {

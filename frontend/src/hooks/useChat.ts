@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { postChat } from '../api/chat'
 import type { Message, Session } from '../types/chat'
 
 const MOCK_RESPONSES = [
@@ -136,7 +137,6 @@ export function useChat() {
   const [activeSessionId, setActiveSessionId] = useState('1')
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
-  const [responseIndex, setResponseIndex] = useState(0)
 
   const activeSession = sessions.find((s) => s.id === activeSessionId)
   const messages = activeSession?.messages ?? []
@@ -151,9 +151,11 @@ export function useChat() {
   )
 
   const sendMessage = useCallback(
-    (text: string) => {
+    async (text: string) => {
       const trimmed = text.trim()
       if (!trimmed || isLoading) return
+
+      const sessionId = activeSessionId
 
       const userMessage: Message = {
         id: createId(),
@@ -162,7 +164,7 @@ export function useChat() {
         timestamp: new Date(),
       }
 
-      updateSession(activeSessionId, (session) => ({
+      updateSession(sessionId, (session) => ({
         ...session,
         title:
           session.messages.length === 0 ? trimmed : session.title,
@@ -173,29 +175,46 @@ export function useChat() {
       setInputValue('')
       setIsLoading(true)
 
-      const delay = 1200 + Math.random() * 800
-      const currentIndex = responseIndex
+      try {
+        const reply = await postChat(sessionId, trimmed)
 
-      setTimeout(() => {
         const botMessage: Message = {
           id: createId(),
           role: 'assistant',
-          content: MOCK_RESPONSES[currentIndex % MOCK_RESPONSES.length],
+          content: reply,
           timestamp: new Date(),
         }
 
         setSessions((prev) =>
           prev.map((s) =>
-            s.id === activeSessionId
+            s.id === sessionId
               ? { ...s, messages: [...s.messages, botMessage] }
               : s,
           ),
         )
+      } catch (error) {
+        const botMessage: Message = {
+          id: createId(),
+          role: 'assistant',
+          content:
+            error instanceof Error
+              ? `Sorry, I couldn't get a response: ${error.message}`
+              : "Sorry, something went wrong. Please try again.",
+          timestamp: new Date(),
+        }
+
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.id === sessionId
+              ? { ...s, messages: [...s.messages, botMessage] }
+              : s,
+          ),
+        )
+      } finally {
         setIsLoading(false)
-        setResponseIndex((i) => i + 1)
-      }, delay)
+      }
     },
-    [activeSessionId, isLoading, responseIndex, updateSession],
+    [activeSessionId, isLoading, updateSession],
   )
 
   const selectSession = useCallback((sessionId: string) => {
