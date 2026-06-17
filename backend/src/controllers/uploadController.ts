@@ -1,5 +1,4 @@
 import express from "express";
-import multer from "multer";
 import axios from "axios";
 import FormData from "form-data";
 import {chunkMarkdown} from "./chunkService.js";

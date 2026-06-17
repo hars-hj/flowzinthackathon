@@ -1,6 +1,8 @@
 import express from "express";
 import multer from "multer";
 import { uploadFile } from "../controllers/uploadController.js";
+import { authenticateToken } from '../middleware/auth.middleware.js';
+import { requireAdmin } from '../middleware/role.middleware.js';
 
 const uploadRouter = express.Router();
 
@@ -11,6 +13,8 @@ const upload = multer({
 
 uploadRouter.post(
     "/",
+    authenticateToken,
+    requireAdmin,
     upload.single("file"),
     uploadFile
 );

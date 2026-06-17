@@ -1,9 +1,11 @@
 import express from 'express';
+import { authenticateToken } from '../middleware/auth.middleware.js';
+import { requireUser } from '../middleware/role.middleware.js';
 import { chatHandler } from '../controllers/chatbotController.js';
 import { embedQuery, retrieveChunks ,chat} from '../controllers/ragService.js';
 const router = express.Router();
 
-router.post('/', chatHandler);
+router.post('/', authenticateToken, requireUser, chatHandler);
 
 // route to test the RAG based bot response with debug information
 router.post("/debug", async (req, res) => {

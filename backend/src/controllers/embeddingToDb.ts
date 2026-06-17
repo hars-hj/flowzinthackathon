@@ -1,4 +1,4 @@
-import {supabase} from '../../lib/supabaseClient.js';
+import {supabaseAdmin} from '../../lib/supabaseClient.js';
 import { v4 as uuidv4 } from 'uuid';
 
 
@@ -24,7 +24,7 @@ export async function storeEmbeddings(chunks: chunks[]) {
         embedding: chunk.embedding
     }));
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
         .from("document_chunks")
         .insert(rows);
 

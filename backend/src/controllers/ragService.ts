@@ -1,6 +1,6 @@
 
 import { Groq } from "groq-sdk";
-import {supabase} from '../../lib/supabaseClient.js';
+import {supabaseAdmin} from '../../lib/supabaseClient.js';
 import { GoogleGenAI } from "@google/genai/web";
 
 // --- Clients ---
@@ -50,7 +50,7 @@ export async function embedQuery(question: string): Promise<number[]> {
 
 //  Search for relevant chunks 
 export async function retrieveChunks(queryEmbedding: number[]): Promise<Chunk[]> {
-  const { data, error } = await supabase.rpc("match_chunks", {
+  const { data, error } = await supabaseAdmin.rpc("match_chunks", {
     query_embedding: queryEmbedding,
     match_count: 5,
     match_threshold: 0.5,
@@ -62,7 +62,7 @@ export async function retrieveChunks(queryEmbedding: number[]): Promise<Chunk[]>
 
 //  Fetch the last N messages for this session 
 async function getConversationHistory(sessionId: string, limit = 10): Promise<Message[]> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("conversations")
     .select("role, content")
     .eq("session_id", sessionId)
@@ -77,7 +77,7 @@ async function getConversationHistory(sessionId: string, limit = 10): Promise<Me
 
 //  Save a message to conversation history 
 async function saveMessage(sessionId: string, role: "user" | "assistant", content: string) {
-  await supabase.from("conversations").insert({ session_id: sessionId, role, content });
+  await supabaseAdmin.from("conversations").insert({ session_id: sessionId, role, content });
 }
 
 //  Build the prompt and call the LLM 

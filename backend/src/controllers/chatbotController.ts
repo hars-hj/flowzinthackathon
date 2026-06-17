@@ -1,6 +1,4 @@
-import { GoogleGenAI } from "@google/genai/web";
-import { Groq } from "groq-sdk";
-import {supabase} from '../../lib/supabaseClient.js';
+
 import { chat } from './ragService.js';
 
  // chat handler to be used in router
