@@ -30,6 +30,8 @@ interface Chunk {
   similarity: number;
 }
 
+const NO_CONTEXT_ANSWER="I don't have that information, please contact our sales team.";
+const FALLBACK_ANSWER="Sorry, I'm having trouble answering right now — please try again later or contact our team";
 //  Embed the user's question 
 export async function embedQuery(question: string): Promise<number[]> {
   const result = await embeddingsModel.models.embedContent({
@@ -46,6 +48,16 @@ export async function embedQuery(question: string): Promise<number[]> {
   }
 
   return result.embeddings[0].values;
+}
+
+export function reorderChunks(chunks: Chunk[]): Chunk[] {
+  if(chunks.length<2) return chunks;
+ 
+  const reordered=[...chunks];
+  const [secondChunk]=reordered.splice(1, 1);
+  reordered.push(secondChunk);                 
+ 
+  return reordered;
 }
 
 //  Search for relevant chunks 
@@ -126,23 +138,30 @@ ${context}`;
 
 // Main exported function: the full RAG pipeline 
 export async function chat(sessionId: string, question: string): Promise<string> {
-  //  Embed the question
-  const queryEmbedding = await embedQuery(question);
-
-  //  Retrieve relevant chunks in parallel with history fetch
-  const [chunks, history] = await Promise.all([
-    retrieveChunks(queryEmbedding),
-    getConversationHistory(sessionId),
-  ]);
-
-  //  Save user message
-  await saveMessage(sessionId, "user", question);
-
-  //  Generate answer
-  const answer = await generateAnswer(question, chunks, history);
-
-  //  Save assistant message
-  await saveMessage(sessionId, "assistant", answer);
-
-  return answer;
+  try {
+    const queryEmbedding=await embedQuery(question);
+    const [rawChunks, history]=await Promise.all([
+      retrieveChunks(queryEmbedding),
+      getConversationHistory(sessionId),
+    ]);
+    
+    const chunks=reorderChunks(rawChunks);
+ 
+    if (!chunks || chunks.length===0) {
+      await saveMessage(sessionId, "user", question);
+      await saveMessage(sessionId, "assistant", NO_CONTEXT_ANSWER);
+      return NO_CONTEXT_ANSWER;
+    }
+ 
+    const answer=await generateAnswer(question, chunks, history);
+    await Promise.all([
+      saveMessage(sessionId, "user", question),
+      saveMessage(sessionId, "assistant", answer),
+    ]);
+ 
+    return answer;
+  } catch (err) {
+    console.error("RAG chat pipeline failed:", err);
+    return FALLBACK_ANSWER;
+  }
 }
