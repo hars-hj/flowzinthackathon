@@ -3,7 +3,9 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { supabaseAdmin } from '../../lib/supabaseClient.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
-const JWKS = createRemoteJWKSet(new URL(`${SUPABASE_URL}/auth/v1/keys`));
+const JWKS = createRemoteJWKSet(
+  new URL(`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`)
+);
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -23,7 +25,7 @@ export async function authenticateToken(
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Missing or invalid authorization header' });
   }
-
+   
   const token = authHeader.split(' ')[1];
 
   try {
@@ -52,6 +54,10 @@ export async function authenticateToken(
 
     next();
   } catch (err) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    console.error(err);
+  return res.status(401).json({
+    error: "Invalid or expired token",
+    details: err instanceof Error ? err.message : err,
+  });
   }
 }

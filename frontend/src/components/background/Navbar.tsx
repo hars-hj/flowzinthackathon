@@ -1,10 +1,15 @@
 import type { JSX } from "react/jsx-runtime"
+import { useNavigate } from "react-router-dom";
 
 interface NavbarProps {
   onStartFree?: () => void
 }
 
 export default function Navbar({ onStartFree }: NavbarProps): JSX.Element {
+  const navigate = useNavigate();
+  const handleLoginClick = () => {
+    navigate("/login");
+  };
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 h-[68px] flex items-center px-15 gap-9 bg-transparent">
       {/* Logo */}
@@ -45,13 +50,13 @@ export default function Navbar({ onStartFree }: NavbarProps): JSX.Element {
       {/* Buttons */}
       <div className="flex items-center gap-2.5 ml-6">
         <button
-          onClick={onStartFree}
+          onClick={handleLoginClick}
           className="bg-transparent border border-white/30 text-white px-5 py-2 rounded-full text-[13px] font-medium cursor-pointer transition-all hover:bg-white/10 hover:border-white/50"
         >
           Sign in
         </button>
         <button
-          onClick={onStartFree}
+          onClick={() => onStartFree?.()}
           className="bg-white text-[#0f2830] border-none px-5 py-2 rounded-full text-[13px] font-semibold cursor-pointer transition-opacity hover:opacity-90"
         >
           Start free ↗

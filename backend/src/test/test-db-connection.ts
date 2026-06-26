@@ -1,4 +1,4 @@
-import { supabase } from "../../lib/supabaseClient.js"
+import { supabaseAdmin } from "../../lib/supabaseClient.js"
 type ConversationInsert = {
   session_id: string
   role: string
@@ -15,7 +15,7 @@ export async function insertConversation({
   escalated = false
 }: ConversationInsert) {
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('conversations')
     .insert([
       {

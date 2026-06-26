@@ -14,30 +14,20 @@ export interface AuthUser {
   role: UserRole
 }
 
-interface LoginResponse {
+export interface LoginResponse {
   accessToken: string
   refreshToken: string
-  user: { id: string; email: string }
-}
-
-interface MeResponse {
   user: AuthUser
 }
 
-export async function loginUser(
-  email: string,
-  password: string,
-  role: UserRole,
-  adminSecret?: string,
-): Promise<AuthUser> {
-  const body: Record<string, string> = { email, password, role }
-  if (role === 'admin' && adminSecret) {
-    body.adminSecret = adminSecret
-  }
+export interface MeResponse {
+  user: AuthUser
+}
 
+export async function loginUser(email: string, password: string): Promise<AuthUser> {
   const data = await apiFetch<LoginResponse>('/api/auth/login', {
     method: 'POST',
-    body: JSON.stringify(body),
+    body: JSON.stringify({ email, password }),
   })
 
   setStoredAuth({
@@ -46,8 +36,7 @@ export async function loginUser(
     user: data.user,
   })
 
-  const me = await fetchMe()
-  return me
+  return fetchMe()
 }
 
 export async function registerUser(email: string, password: string): Promise<void> {
@@ -71,6 +60,7 @@ export async function registerAdmin(
 export async function fetchMe(): Promise<AuthUser> {
   const data = await apiFetch<MeResponse>('/api/auth/me')
   const stored = getStoredAuth()
+  
   if (stored) {
     setStoredAuth({
       ...stored,

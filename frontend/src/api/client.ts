@@ -32,6 +32,41 @@ export function getAccessToken(): string | null {
   return getStoredAuth()?.accessToken ?? null
 }
 
+export async function refreshSession(): Promise<StoredAuth | null> {
+  const stored = getStoredAuth()
+  if (!stored?.refreshToken) {
+    return null
+  }
+
+  const res = await fetch('/api/auth/refresh', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refreshToken: stored.refreshToken }),
+  })
+
+  if (!res.ok) {
+    return null
+  }
+
+  const data = (await res.json().catch(() => null)) as {
+    accessToken?: string
+    refreshToken?: string
+  } | null
+
+  if (!data?.accessToken || !data?.refreshToken) {
+    return null
+  }
+
+  const nextAuth = {
+    ...stored,
+    accessToken: data.accessToken,
+    refreshToken: data.refreshToken,
+  }
+
+  setStoredAuth(nextAuth)
+  return nextAuth
+}
+
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {},
@@ -48,6 +83,25 @@ export async function apiFetch<T>(
   }
 
   const res = await fetch(path, { ...options, headers })
+
+  if (res.status === 401) {
+    const refreshed = await refreshSession()
+    if (refreshed) {
+      const retryHeaders = new Headers(options.headers)
+      retryHeaders.set('Authorization', `Bearer ${refreshed.accessToken}`)
+      const retryRes = await fetch(path, {
+        ...options,
+        headers: retryHeaders,
+      })
+
+      if (!retryRes.ok) {
+        const body = (await retryRes.json().catch(() => null)) as { error?: string } | null
+        throw new Error(body?.error ?? `Request failed (${retryRes.status})`)
+      }
+
+      return retryRes.json() as Promise<T>
+    }
+  }
 
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as { error?: string } | null

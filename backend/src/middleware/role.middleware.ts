@@ -7,7 +7,7 @@ export function requireAdmin(
   next: NextFunction
 ) {
   if (!req.user || req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Admin access required' });
+    return res.status(403).json({ error: 'Forbidden' });
   }
   next();
 }

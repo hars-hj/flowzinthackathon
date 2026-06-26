@@ -1,6 +1,6 @@
-import { supabase } from '../lib/supabaseClient.js';
+import { supabaseAdmin } from "../../lib/supabaseClient.js";
 export async function insertConversation({ session_id, role, message, sentiment = 'neutral', escalated = false }) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
         .from('conversations')
         .insert([
         {

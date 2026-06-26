@@ -6,17 +6,14 @@ import {
   AuthError,
   AuthField,
   AuthLayout,
-  RoleToggle,
 } from '../components/auth/AuthLayout'
 import { useAuth } from '../context/AuthContext'
 
 export function LoginPage() {
   const navigate = useNavigate()
   const { setUser } = useAuth()
-  const [role, setRole] = useState<'user' | 'admin'>('user')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [adminSecret, setAdminSecret] = useState('')
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
@@ -26,14 +23,9 @@ export function LoginPage() {
     setIsLoading(true)
 
     try {
-      const user = await loginUser(
-        email,
-        password,
-        role,
-        role === 'admin' ? adminSecret : undefined,
-      )
+      const user = await loginUser(email, password)
       setUser(user)
-      navigate(role === 'admin' ? '/admin' : '/', { replace: true })
+      navigate(user.role === 'admin' ? '/admin' : '/chats', { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
     } finally {
@@ -55,7 +47,6 @@ export function LoginPage() {
       }
     >
       <form onSubmit={handleSubmit}>
-        <RoleToggle value={role} onChange={setRole} />
         <AuthError message={error} />
         <AuthField
           label="Email"
@@ -71,15 +62,6 @@ export function LoginPage() {
           onChange={setPassword}
           placeholder="Enter your password"
         />
-        {role === 'admin' && (
-          <AuthField
-            label="Admin secret code"
-            type="password"
-            value={adminSecret}
-            onChange={setAdminSecret}
-            placeholder="Enter admin secret"
-          />
-        )}
         <AuthButton isLoading={isLoading}>Sign in</AuthButton>
       </form>
     </AuthLayout>

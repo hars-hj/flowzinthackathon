@@ -54,32 +54,24 @@ export async function registerAdmin(req: Request, res: Response) {
 }
 
 export async function login(req: Request, res: Response) {
-  const { email, password, adminSecret, role } = req.body;
+  const { email, password } = req.body;
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required' });
-  }
-
-  if (role === 'admin') {
-    if (!adminSecret || adminSecret !== process.env.ADMIN_REGISTRATION_SECRET) {
-      return res.status(403).json({ error: 'Invalid admin secret' });
-    }
   }
 
   const { data, error } = await supabaseAnon.auth.signInWithPassword({ email, password });
 
   if (error) return res.status(401).json({ error: error.message });
 
-  if (role === 'admin') {
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', data.user.id)
-      .single();
+  const { data: profile, error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .select('role')
+    .eq('id', data.user.id)
+    .single();
 
-    if (profileError || !profile || profile.role !== 'admin') {
-      return res.status(403).json({ error: 'This account does not have admin access' });
-    }
+  if (profileError || !profile) {
+    return res.status(500).json({ error: 'Failed to load user profile' });
   }
 
   return res.status(200).json({
@@ -87,7 +79,8 @@ export async function login(req: Request, res: Response) {
     refreshToken: data.session.refresh_token,
     user: {
       id: data.user.id,
-      email: data.user.email,
+      email: data.user.email ?? '',
+      role: (profile.role as 'user' | 'admin') ?? 'user',
     },
   });
 }
