@@ -1,66 +1,77 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
-import { ProtectedRoute } from './components/ProtectedRoute'
-import { useAuth } from './context/AuthContext'
-import { AdminPage } from './pages/AdminPage'
-import { ChatPage } from './pages/ChatPage'
-import { LoginPage } from './pages/LoginPage'
-import { SignupPage } from './pages/SignupPage'
+import { useState } from 'react'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { Header } from './components/Header'
+import { InputArea } from './components/InputArea'
+import { MessageList } from './components/MessageList'
+import { Sidebar } from './components/Sidebar'
+import { useAutoScroll } from './hooks/useAutoScroll'
+import { useChat } from './hooks/useChat'
+import LandingPage from './components/background/LandingPage'
 
-function AuthRedirect({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth()
+function ChatApp() {
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const {
+    sessions,
+    activeSessionId,
+    messages,
+    isLoading,
+    inputValue,
+    setInputValue,
+    sendMessage,
+    selectSession,
+    newChat,
+    clearConversation,
+    formatRelativeTime,
+  } = useChat()
 
-  if (isLoading) {
-    return (
-      <div className="flex h-full items-center justify-center bg-background">
-        <p className="font-ui text-sm text-text-secondary">Loading…</p>
-      </div>
-    )
+  const bottomRef = useAutoScroll([messages, isLoading])
+
+  const handleSuggestedSelect = (text: string) => {
+    sendMessage(text)
   }
 
-  if (user) {
-    return <Navigate to={user.role === 'admin' ? '/admin' : '/'} replace />
-  }
-
-  return children
+  return (
+    <div className="grid h-full grid-cols-1 overflow-hidden md:grid-cols-[260px_1fr]">
+      <Sidebar
+        sessions={sessions}
+        activeSessionId={activeSessionId}
+        onSelectSession={selectSession}
+        onNewChat={newChat}
+        formatRelativeTime={formatRelativeTime}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
+      <main className="flex min-w-0 flex-col overflow-hidden bg-background">
+        <Header
+          onClear={clearConversation}
+          onMenuOpen={() => setSidebarOpen(true)}
+        />
+        <MessageList
+          messages={messages}
+          isLoading={isLoading}
+          onSuggestedSelect={handleSuggestedSelect}
+          bottomRef={bottomRef}
+        />
+        <InputArea
+          value={inputValue}
+          onChange={setInputValue}
+          onSend={sendMessage}
+          isLoading={isLoading}
+        />
+      </main>
+    </div>
+  )
 }
 
 function App() {
   return (
-    <Routes>
-      <Route
-        path="/login"
-        element={
-          <AuthRedirect>
-            <LoginPage />
-          </AuthRedirect>
-        }
-      />
-      <Route
-        path="/signup"
-        element={
-          <AuthRedirect>
-            <SignupPage />
-          </AuthRedirect>
-        }
-      />
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <ChatPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin"
-        element={
-          <ProtectedRoute adminOnly>
-            <AdminPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/chat" element={<ChatApp />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
   )
 }
 

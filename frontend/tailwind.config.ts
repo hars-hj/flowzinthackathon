@@ -20,10 +20,18 @@ const config: Config = {
         },
         'sidebar-hover': 'rgb(var(--color-sidebar-hover) / <alpha-value>)',
         online: '#22C55E',
+        // Added: used throughout the landing page (Navbar, Hero, WhyNexa, RAG, Deploy, CTA)
+        // e.g. text-teal, bg-teal, bg-teal-dark, border-teal, hover:bg-teal-dark
+        teal: {
+          DEFAULT: '#2DD4BF',
+          dark: '#14B8A6',
+        },
       },
       fontFamily: {
         ui: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
         message: ['"DM Sans"', 'system-ui', 'sans-serif'],
+        // Added: landing page headlines use font-serif (h1/h2 in Hero, WhyNexa, RAG, Deploy, CTA)
+        serif: ['"Playfair Display"', 'Georgia', 'serif'],
       },
       fontSize: {
         xs: ['13px', { lineHeight: '1.5' }],
@@ -31,10 +39,20 @@ const config: Config = {
         base: ['15px', { lineHeight: '1.5' }],
         lg: ['18px', { lineHeight: '1.5' }],
       },
+      // Added: non-standard spacing values used throughout the landing page
+      // (mb-13, px-13, px-15, py-15, py-25, pt-25, p-7.5, px-7.5, px-6.5)
+      // Default Tailwind scale has no 6.5, 7.5, 13, 15, 25 — without this
+      // these classes silently produced no CSS at all.
+      spacing: {
+        '6.5': '1.625rem',
+        '7.5': '1.875rem',
+        '13': '3.25rem',
+        '15': '3.75rem',
+        '25': '6.25rem',
+      },
       transitionDuration: {
         DEFAULT: '150ms',
-      },
-      transitionTimingFunction: {
+      },transitionTimingFunction: {
         DEFAULT: 'ease',
       },
       keyframes: {

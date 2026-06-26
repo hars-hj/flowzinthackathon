@@ -21,8 +21,14 @@ export async function embedChunks(chunks: Chunk[]) {
     contents: chunks.map(chunk => chunk.content),
     });
 
+    if(!response.embeddings) {
+        throw new Error("Embedding response missing embeddings");
+    }
+
+    const embeddings=response.embeddings;
+
     return chunks.map((chunk, i) => ({
         ...chunk,
-        embedding: response.embeddings[i].values,
+        embedding: embeddings[i].values,
     }));
 }
