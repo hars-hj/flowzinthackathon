@@ -4,6 +4,8 @@ import FormData from "form-data";
 import {chunkMarkdown} from "./chunkService.js";
 import { embedChunks } from "./embeddingService.js";
 import { storeEmbeddings } from "./embeddingToDb.js";
+import { supabaseAdmin } from "../../lib/supabaseClient.js";
+import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 
  async function uploadFile(req: express.Request, res: express.Response) {
         try {
@@ -59,4 +61,39 @@ import { storeEmbeddings } from "./embeddingToDb.js";
         }
     }
 
-    export { uploadFile };
+async function listFiles(req: AuthenticatedRequest, res: express.Response) {
+    try {
+        const { data, error } = await supabaseAdmin
+            .from("document_chunks")
+            .select("document_id, filename");
+
+        if (error) {
+            return res.status(500).json({ error: error.message });
+        }
+
+        const fileMap = new Map<
+            string,
+            { documentId: string; filename: string; chunkCount: number }
+        >();
+
+        for (const row of data ?? []) {
+            const existing = fileMap.get(row.document_id);
+            if (existing) {
+                existing.chunkCount += 1;
+            } else {
+                fileMap.set(row.document_id, {
+                    documentId: row.document_id,
+                    filename: row.filename,
+                    chunkCount: 1,
+                });
+            }
+        }
+
+        return res.status(200).json({ files: Array.from(fileMap.values()) });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ error: "Failed to list files" });
+    }
+}
+
+export { uploadFile, listFiles };

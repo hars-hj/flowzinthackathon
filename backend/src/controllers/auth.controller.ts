@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { supabaseAnon, supabaseAdmin } from '../../lib/supabaseClient.js';
+import type { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 
 export async function register(req: Request, res: Response) {
   const { email, password, name } = req.body;
@@ -53,15 +54,33 @@ export async function registerAdmin(req: Request, res: Response) {
 }
 
 export async function login(req: Request, res: Response) {
-  const { email, password } = req.body;
+  const { email, password, adminSecret, role } = req.body;
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required' });
   }
 
+  if (role === 'admin') {
+    if (!adminSecret || adminSecret !== process.env.ADMIN_REGISTRATION_SECRET) {
+      return res.status(403).json({ error: 'Invalid admin secret' });
+    }
+  }
+
   const { data, error } = await supabaseAnon.auth.signInWithPassword({ email, password });
 
   if (error) return res.status(401).json({ error: error.message });
+
+  if (role === 'admin') {
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', data.user.id)
+      .single();
+
+    if (profileError || !profile || profile.role !== 'admin') {
+      return res.status(403).json({ error: 'This account does not have admin access' });
+    }
+  }
 
   return res.status(200).json({
     accessToken: data.session.access_token,
@@ -71,6 +90,13 @@ export async function login(req: Request, res: Response) {
       email: data.user.email,
     },
   });
+}
+
+export async function getMe(req: AuthenticatedRequest, res: Response) {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  return res.status(200).json({ user: req.user });
 }
 
 export async function refreshToken(req: Request, res: Response) {

@@ -1,4 +1,6 @@
-import { Plus, Settings } from 'lucide-react'
+import { LogOut, Plus } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import type { Session } from '../types/chat'
 
 interface SidebarProps {
@@ -20,6 +22,17 @@ export function Sidebar({
   isOpen,
   onClose,
 }: SidebarProps) {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+
+  const initials = user?.email?.slice(0, 2).toUpperCase() ?? 'U'
+  const displayName = user?.email?.split('@')[0] ?? 'User'
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login', { replace: true })
+  }
+
   return (
     <>
       {isOpen && (
@@ -96,17 +109,27 @@ export function Sidebar({
 
         <div className="flex h-14 shrink-0 items-center border-t border-border px-4">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-light">
-            <span className="font-ui text-xs font-medium text-accent">AJ</span>
+            <span className="font-ui text-xs font-medium text-accent">{initials}</span>
           </div>
-          <span className="ml-3 flex-1 font-ui text-xs text-text-primary">
-            Arjun J.
+          <span className="ml-3 flex-1 truncate font-ui text-xs text-text-primary">
+            {displayName}
           </span>
+          {user?.role === 'admin' && (
+            <button
+              type="button"
+              onClick={() => navigate('/admin')}
+              className="mr-1 rounded-md px-2 py-1 font-ui text-[10px] text-accent transition-all duration-150 hover:bg-accent-light"
+            >
+              Admin
+            </button>
+          )}
           <button
             type="button"
+            onClick={handleLogout}
             className="text-text-hint transition-all duration-150 hover:text-text-secondary"
-            aria-label="Settings"
+            aria-label="Log out"
           >
-            <Settings className="h-4 w-4" strokeWidth={2} />
+            <LogOut className="h-4 w-4" strokeWidth={2} />
           </button>
         </div>
       </aside>

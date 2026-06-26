@@ -1,10 +1,18 @@
+import { getAccessToken } from './client'
+
 export async function postChat(
   sessionId: string,
   message: string,
 ): Promise<string> {
+  const token = getAccessToken()
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+
   const res = await fetch('/api/chat', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ sessionId, message }),
   })
 
