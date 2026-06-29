@@ -50,26 +50,77 @@ export async function embedQuery(question: string): Promise<number[]> {
   return result.embeddings[0].values;
 }
 
-export function reorderChunks(chunks: Chunk[]): Chunk[] {
+async function rerankChunks(question: string, chunks: Chunk[]): Promise<Chunk[]> {
   if(chunks.length<2) return chunks;
- 
-  const reordered=[...chunks];
-  const [secondChunk]=reordered.splice(1, 1);
-  reordered.push(secondChunk);                 
- 
-  return reordered;
+  console.log("RERANKING STARTED")
+  const scores= await Promise.all(
+    chunks.map(async (chunk)=> {
+      const response= await groq.chat.completions.create({
+        model: "llama-3.3-70b-versatile",
+        messages: [
+          {
+            role: "system",
+            content: "Score how relevant this document chunk is to the question on a scale of 0-10. Reply with ONLY a single number, nothing else.",
+          },
+          {
+            role: "user",
+            content: `Question: ${question}\n\nChunk: ${chunk.content.slice(0, 400)}`,
+          },
+        ],
+        max_tokens: 5,
+        temperature: 0,
+      });
+
+      const score= parseFloat(response.choices[0].message.content?.trim() ?? "5");
+      return { chunk, score: isNaN(score) ? 5 : score };  // default 5 not 0
+    })
+  );
+  console.log("RERANKING ENDED: ", scores)
+  return scores.sort((a, b)=> b.score-a.score).map((s) => s.chunk);
 }
 
-//  Search for relevant chunks 
-export async function retrieveChunks(queryEmbedding: number[]): Promise<Chunk[]> {
-  const { data, error } = await supabaseAdmin.rpc("match_chunks", {
-    query_embedding: queryEmbedding,
-    match_count: 5,
-    match_threshold: 0.5,
+export async function retrieveChunks(queryEmbedding: number[], keywords: string): Promise<Chunk[]> {
+  console.log("RETRIEVE CHUNKS")
+  const [vectorResults, keywordResults]= await Promise.all([
+    supabaseAdmin.rpc("match_chunks", {
+      query_embedding: queryEmbedding,
+      match_count: 8,
+      match_threshold: 0.5,
+    }),
+    supabaseAdmin
+      .from("document_chunks")
+      .select("id, filename, content, page, chunk_index")
+      .textSearch("fts", keywords, { type: "websearch" })
+      .limit(8),
+  ]);
+
+  if (vectorResults.error) throw new Error(`Vector search failed: ${vectorResults.error.message}`);
+  const RRF_K= 60;
+  const scores= new Map<string, { chunk: Chunk; score: number }>();
+
+  const seen= new Set<string>();
+  (vectorResults.data ?? []).forEach((chunk: Chunk, rank: number) => {
+    const key= `${chunk.filename}-${chunk.chunk_index}`;
+    const rrfScore= 1/(RRF_K+rank+1);
+    if (!seen.has(key)) {
+      seen.add(key);
+      scores.set(key, { chunk, score: rrfScore });
+    }
   });
 
-  if (error) throw new Error(`Vector search failed: ${error.message}`);
-  return data as Chunk[];
+  (keywordResults.data ?? []).forEach((chunk: any, rank: number) => {
+    const key= `${chunk.filename}-${chunk.chunk_index}`;
+    const rrfScore= 1/(RRF_K+rank+1);
+    const existing= scores.get(key);
+    if (existing) {
+      existing.score+= rrfScore;
+    } else if (!seen.has(key)) {
+      seen.add(key);
+      scores.set(key, { chunk: { ...chunk, similarity: 0 }, score: rrfScore });
+    }
+  });
+  console.log("RETRIEVE CHUNKS ENDED", scores)
+  return Array.from(scores.values()).sort((a, b)=> b.score - a.score).slice(0, 5).map((s)=> s.chunk);
 }
 
 //  Fetch the last N messages for this session 
@@ -98,7 +149,7 @@ async function generateAnswer(
   chunks: Chunk[],
   history: Message[]
 ): Promise<string> {
-  // Build context from retrieved chunks
+  console.log("GENERATE ANSWER CALLED")
   const context = chunks
     .map((c, i) => `[Source ${i + 1}: ${c.filename}, page ${c.page}]\n${c.content}`)
     .join("\n\n---\n\n");
@@ -112,8 +163,7 @@ STRICT RULES — follow these exactly, no exceptions:
 4. Never use phrases like "may be eligible", "might", "could potentially" unless those exact words appear in the source. Hedging language invents uncertainty that may not exist.
 5. If the answer is simply "no" — say no clearly and explain why, then stop.
 6. Never contradict yourself within a single answer.
-
-7.if the answer is not in the provided context, say "I don't have that information, please contact our sales team."
+7. If the answer is not in the provided context, say "I don't have that information, please contact our sales team."
 Be concise, professional, and helpful.
 
 COMPANY INFORMATION:
@@ -129,9 +179,9 @@ ${context}`;
     model: "llama-3.3-70b-versatile",
     messages,
     max_tokens: 1024,
-    temperature: 0.1, // lower = more factual, less creative
+    temperature: 0.1,
   });
-
+  console.log("GENERATE ANSWER ENDED", response.choices[0].message)
   return response.choices[0].message.content ?? "Sorry, I could not generate a response.";
 }
 
@@ -139,26 +189,27 @@ ${context}`;
 // Main exported function: the full RAG pipeline 
 export async function chat(sessionId: string, question: string): Promise<string> {
   try {
-    const queryEmbedding=await embedQuery(question);
-    const [rawChunks, history]=await Promise.all([
-      retrieveChunks(queryEmbedding),
+    console.log("CHAT");
+    const queryEmbedding = await embedQuery(question);
+    const keywords= question.split(" ").slice(0, 6).join(" | ");
+    const [rawChunks, history] = await Promise.all([
+      retrieveChunks(queryEmbedding, keywords),
       getConversationHistory(sessionId),
     ]);
-    
-    const chunks=reorderChunks(rawChunks);
- 
-    if (!chunks || chunks.length===0) {
+
+    if (!rawChunks || rawChunks.length=== 0) {
       await saveMessage(sessionId, "user", question);
       await saveMessage(sessionId, "assistant", NO_CONTEXT_ANSWER);
       return NO_CONTEXT_ANSWER;
     }
- 
-    const answer=await generateAnswer(question, chunks, history);
+    const chunks= await rerankChunks(question, rawChunks);
+
+    const answer= await generateAnswer(question, chunks, history);
     await Promise.all([
       saveMessage(sessionId, "user", question),
       saveMessage(sessionId, "assistant", answer),
     ]);
- 
+    console.log("CHATEND");
     return answer;
   } catch (err) {
     console.error("RAG chat pipeline failed:", err);

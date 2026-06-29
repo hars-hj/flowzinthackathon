@@ -9,9 +9,10 @@ router.post('/', authenticateToken, chatHandler);
 
 // route to test the RAG based bot response with debug information
 router.post("/debug", async (req, res) => {
-  const { message,sessionId } = req.body;
+  const { message, sessionId }=req.body;
   const embedding = await embedQuery(message);
-  const chunks = await retrieveChunks(embedding);
+  const keywords = message.split(" ").slice(0, 6).join(" | ");
+  const chunks = await retrieveChunks(embedding, keywords);
   const answer = await chat(sessionId, message);
   res.json({
     question: message,
@@ -19,10 +20,9 @@ router.post("/debug", async (req, res) => {
       similarity: c.similarity.toFixed(3),
       source: c.filename,
       page: c.page,
-      preview: c.content.slice(0, 200) + "..."
+      preview: c.content.slice(0, 200) + "...",
     })),
-    response: answer
-      
+    response: answer,
   });
 });
 
