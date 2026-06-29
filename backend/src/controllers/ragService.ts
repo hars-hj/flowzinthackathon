@@ -185,9 +185,29 @@ ${context}`;
   return response.choices[0].message.content ?? "Sorry, I could not generate a response.";
 }
 
+async function logQuery(data: {
+  sessionId: string;
+  question: string;
+  chunksRetrieved: number;
+  topChunkScore: number;
+  finalAnswer: string;
+  latencyMs: number;
+  escalated: boolean;
+}) {
+  await supabaseAdmin.from("query_logs").insert({
+    session_id: data.sessionId,
+    question: data.question,
+    chunks_retrieved: data.chunksRetrieved,
+    top_chunk_score: data.topChunkScore,
+    final_answer: data.finalAnswer,
+    latency_ms: data.latencyMs,
+    escalated: data.escalated,
+  });
+}
 
 // Main exported function: the full RAG pipeline 
 export async function chat(sessionId: string, question: string): Promise<string> {
+  const start= Date.now();
   try {
     console.log("CHAT");
     const queryEmbedding = await embedQuery(question);
@@ -197,18 +217,37 @@ export async function chat(sessionId: string, question: string): Promise<string>
       getConversationHistory(sessionId),
     ]);
 
-    if (!rawChunks || rawChunks.length=== 0) {
+    if(!rawChunks || rawChunks.length=== 0){
       await saveMessage(sessionId, "user", question);
       await saveMessage(sessionId, "assistant", NO_CONTEXT_ANSWER);
+      await logQuery({
+        sessionId,
+        question,
+        chunksRetrieved: 0,
+        topChunkScore: 0,
+        finalAnswer: NO_CONTEXT_ANSWER,
+        latencyMs: Date.now()- start,
+        escalated: false,
+      });
       return NO_CONTEXT_ANSWER;
     }
-    const chunks= await rerankChunks(question, rawChunks);
 
+    const chunks= await rerankChunks(question, rawChunks);
     const answer= await generateAnswer(question, chunks, history);
     await Promise.all([
       saveMessage(sessionId, "user", question),
       saveMessage(sessionId, "assistant", answer),
+      logQuery({
+        sessionId,
+        question,
+        chunksRetrieved: chunks.length,
+        topChunkScore: chunks[0]?.similarity ?? 0,
+        finalAnswer: answer,
+        latencyMs: Date.now() - start,
+        escalated: false,
+      }),
     ]);
+
     console.log("CHATEND");
     return answer;
   } catch (err) {

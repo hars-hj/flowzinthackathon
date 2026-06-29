@@ -82,6 +82,9 @@ export function AdminPage() {
           >
             Open chat
           </button>
+          <button onClick={() => navigate('/analytics')} className='rounded-lg border border-border px-3 py-1.5 font-ui text-xs text-text-secondary transition-all duration-150 hover:bg-accent-light hover:text-accent'>
+            Analytics
+          </button>
           <button
             type="button"
             onClick={handleLogout}

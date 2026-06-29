@@ -3,6 +3,7 @@ import { authenticateToken } from '../middleware/auth.middleware.js';
 import { requireUser } from '../middleware/role.middleware.js';
 import { chatHandler } from '../controllers/chatbotController.js';
 import { embedQuery, retrieveChunks ,chat} from '../controllers/ragService.js';
+import { supabaseAdmin } from '../../lib/supabaseClient.js';
 const router = express.Router();
 
 router.post('/', authenticateToken, chatHandler);
@@ -23,6 +24,39 @@ router.post("/debug", async (req, res) => {
       preview: c.content.slice(0, 200) + "...",
     })),
     response: answer,
+  });
+});
+
+router.get("/analytics", authenticateToken, async (req, res) => {
+  const { data, error } = await supabaseAdmin
+    .from("query_logs")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  const total = data.length;
+  const avgLatency = Math.round(data.reduce((sum, r) => sum + r.latency_ms, 0) / (total || 1));
+  const escalations = data.filter((r) => r.escalated).length;
+  const noContextCount = data.filter((r) => r.final_answer === "I don't have that information, please contact our sales team.").length;
+
+  const questionFreq = data.reduce((acc: Record<string, number>, r) => {
+    acc[r.question] = (acc[r.question] || 0) + 1;
+    return acc;
+  }, {});
+
+  const topQuestions = Object.entries(questionFreq)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([question, count]) => ({ question, count }));
+
+  return res.json({
+    total_queries: total,
+    avg_latency_ms: avgLatency,
+    escalation_rate: total ? `${((escalations / total) * 100).toFixed(1)}%` : "0%",
+    no_context_rate: total ? `${((noContextCount / total) * 100).toFixed(1)}%` : "0%",
+    top_questions: topQuestions,
+    recent_queries: data.slice(0, 20),
   });
 });
 

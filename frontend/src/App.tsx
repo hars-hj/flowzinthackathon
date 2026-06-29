@@ -6,7 +6,7 @@ import {SignupPage} from './pages/SignupPage'
 import { ChatPage } from './pages/ChatPage'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { AdminPage } from './pages/AdminPage'
-
+import { AnalyticsPage } from './pages/AnalyticsPage'
 // function AuthRedirect({ children }: { children: React.ReactNode }) {
 //   const { user, isLoading } = useAuth()
 
@@ -67,6 +67,7 @@ function App() {
           </ProtectedRoute>
         }
       />
+      <Route path="/analytics" element={<AnalyticsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
    
