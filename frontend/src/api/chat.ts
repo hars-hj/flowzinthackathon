@@ -41,3 +41,9 @@ export async function postChat(
     }),
   })
 }
+
+export async function deleteChat(sessionId: string): Promise<void> {
+  await apiFetch<void>(`/api/chat/${encodeURIComponent(sessionId)}`, {
+    method: 'DELETE',
+  })
+}

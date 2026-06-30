@@ -65,6 +65,56 @@ export async function chatHandler(req: AuthenticatedRequest, res: Response): Pro
   }
 }
 
+export async function deleteSessionHandler(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const userId = req.user!.id
+  const { sessionId } = req.params
+
+  if (!sessionId) {
+    res.status(400).json({ error: 'Missing sessionId parameter' })
+    return
+  }
+
+  const { data: sessionRecord, error: ownershipError } = await supabaseAdmin
+    .from('user_session')
+    .select('session_id')
+    .eq('user_id', userId)
+    .eq('session_id', sessionId)
+    .maybeSingle()
+
+  if (ownershipError) {
+    res.status(500).json({ error: ownershipError.message })
+    return
+  }
+
+  if (!sessionRecord) {
+    res.status(404).json({ error: 'Session not found' })
+    return
+  }
+
+  const { error: deleteConversationsError } = await supabaseAdmin
+    .from('conversations')
+    .delete()
+    .eq('session_id', sessionId)
+
+  if (deleteConversationsError) {
+    res.status(500).json({ error: deleteConversationsError.message })
+    return
+  }
+
+  const { error: deleteSessionError } = await supabaseAdmin
+    .from('user_session')
+    .delete()
+    .eq('user_id', userId)
+    .eq('session_id', sessionId)
+
+  if (deleteSessionError) {
+    res.status(500).json({ error: deleteSessionError.message })
+    return
+  }
+
+  res.status(204).end()
+}
+
 export async function getSessionsHandler(req: AuthenticatedRequest, res: Response): Promise<void> {
   const userId = req.user!.id;
 

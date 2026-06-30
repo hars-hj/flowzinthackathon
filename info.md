@@ -51,6 +51,7 @@ It combines:
 - Chat endpoints (all require authentication via JWT):
   - `GET /api/chat/sessions` — loads the current user's chat sessions and message history
   - `POST /api/chat` — sends a message and returns `{ reply, sessionId }`
+  - `DELETE /api/chat/:sessionId` — deletes the session conversation history and removes the `user_session` link for the authenticated user
   - `GET /api/chat/analytics` — query analytics for admins
 - Session ownership is managed by the backend in the `user_session` table (`user_id`, `session_id`).
   - On `POST /api/chat`, if `sessionId` is missing or `"new"`, the backend generates a UUID and creates a `user_session` row for the authenticated user.

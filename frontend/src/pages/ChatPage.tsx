@@ -18,7 +18,7 @@ export function ChatPage() {
     sendMessage,
     selectSession,
     newChat,
-    clearConversation,
+    deleteConversation,
     formatRelativeTime,
   } = useChat()
 
@@ -42,7 +42,10 @@ export function ChatPage() {
 
       <main className="flex min-w-0 flex-col overflow-hidden bg-background">
         <Header
-          onClear={clearConversation}
+          onDelete={() => {
+            if (activeSessionId) deleteConversation(activeSessionId)
+          }}
+          isDeleteDisabled={!activeSessionId}
           onMenuOpen={() => setSidebarOpen(true)}
         />
         <MessageList

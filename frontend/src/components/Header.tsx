@@ -1,11 +1,12 @@
 import { Menu, Trash2 } from 'lucide-react'
 
 interface HeaderProps {
-  onClear: () => void
+  onDelete: () => void
   onMenuOpen: () => void
+  isDeleteDisabled?: boolean
 }
 
-export function Header({ onClear, onMenuOpen }: HeaderProps) {
+export function Header({ onDelete, onMenuOpen, isDeleteDisabled }: HeaderProps) {
   return (
     <header className="flex h-16 shrink-0 items-center border-b border-border bg-surface px-4 md:px-6">
       <button
@@ -30,14 +31,15 @@ export function Header({ onClear, onMenuOpen }: HeaderProps) {
       <div className="group relative">
         <button
           type="button"
-          onClick={onClear}
-          className="flex h-9 w-9 items-center justify-center rounded-lg text-text-hint transition-all duration-150 hover:bg-surface-muted"
-          aria-label="Clear conversation"
+          onClick={onDelete}
+          disabled={isDeleteDisabled}
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-text-hint transition-all duration-150 hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
+          aria-label="Delete conversation"
         >
           <Trash2 className="h-4 w-4" strokeWidth={2} />
         </button>
         <span className="pointer-events-none absolute -bottom-8 right-0 whitespace-nowrap rounded-md bg-text-primary px-2 py-1 font-ui text-xs text-surface opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-          Clear conversation
+          Delete conversation
         </span>
       </div>
     </header>

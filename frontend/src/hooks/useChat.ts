@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   fetchChatSessions,
   postChat,
+  deleteChat,
   type ApiSession,
 } from '../api/chat'
 import type { Message, Session } from '../types/chat'
@@ -202,16 +203,21 @@ export function useChat() {
     setInputValue('')
   }, [])
 
-  const clearConversation = useCallback(() => {
-    if (!activeSessionId) return
-
-    updateSession(activeSessionId, (session) => ({
-      ...session,
-      title: 'New conversation',
-      messages: [],
-    }))
-    setIsLoading(false)
-  }, [activeSessionId, updateSession])
+  const deleteConversation = useCallback(
+    async (sessionId: string) => {
+      try {
+        await deleteChat(sessionId)
+        setSessions((prev) => prev.filter((session) => session.id !== sessionId))
+        setActiveSessionId((prev) => {
+          if (prev !== sessionId) return prev
+          return sessions.find((session) => session.id !== sessionId)?.id ?? null
+        })
+      } catch (error) {
+        console.error('Failed to delete conversation:', error)
+      }
+    },
+    [sessions],
+  )
 
   return {
     sessions,
@@ -223,7 +229,7 @@ export function useChat() {
     sendMessage,
     selectSession,
     newChat,
-    clearConversation,
+    deleteConversation,
     formatRelativeTime,
   }
 }

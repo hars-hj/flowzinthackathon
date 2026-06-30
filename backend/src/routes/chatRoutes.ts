@@ -1,13 +1,14 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth.middleware.js';
 import { requireUser } from '../middleware/role.middleware.js';
-import { chatHandler, getSessionsHandler } from '../controllers/chatbotController.js';
+import { chatHandler, getSessionsHandler, deleteSessionHandler } from '../controllers/chatbotController.js';
 import { embedQuery, retrieveChunks ,chat} from '../controllers/ragService.js';
 import { supabaseAdmin } from '../../lib/supabaseClient.js';
 const router = express.Router();
 
 router.get('/sessions', authenticateToken, getSessionsHandler);
 router.post('/', authenticateToken, chatHandler);
+router.delete('/:sessionId', authenticateToken, deleteSessionHandler);
 
 // route to test the RAG based bot response with debug information
 router.post("/debug", async (req, res) => {
