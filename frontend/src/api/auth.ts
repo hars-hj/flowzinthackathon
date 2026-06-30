@@ -46,6 +46,7 @@ export async function registerUser(email: string, password: string): Promise<voi
   })
 }
 
+
 export async function registerAdmin(
   email: string,
   password: string,

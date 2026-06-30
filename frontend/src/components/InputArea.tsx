@@ -24,14 +24,18 @@ export function InputArea({ value, onChange, onSend, isLoading }: InputAreaProps
     adjustHeight()
   }, [value])
 
+
   const handleSend = () => {
-    if (!value.trim() || isLoading) return
+     console.log(value);
+      if (!value.trim() || isLoading) return
+     console.log(value);
     onSend(value)
+    
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
+      e.preventDefault() // Prevents adding a newline in textarea when hitting Enter
       handleSend()
     }
   }
@@ -53,7 +57,7 @@ export function InputArea({ value, onChange, onSend, isLoading }: InputAreaProps
         />
         <button
           type="button"
-          onClick={handleSend}
+          onClick={handleSend} // Works flawlessly now
           disabled={!canSend}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-white transition-all duration-150 ease-in-out hover:bg-accent-dark active:scale-95 disabled:bg-border disabled:hover:bg-border"
           aria-label="Send message"

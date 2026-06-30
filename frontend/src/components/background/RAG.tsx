@@ -35,7 +35,7 @@ export default function RAG({ onSeePipeline }: RAGProps): JSX.Element {
 
         {/* Left */}
         <div>
-          <div className="fu text-[10.5px] font-semibold tracking-[2.2px] uppercase text-teal mb-5 before:content-['/\00a0'] before:opacity-50">
+          <div className="fu text-[10.5px] font-semibold tracking-[2.2px] uppercase text-teal mb-5 before:content-['/'] before:opacity-50">
             02 — Our RAG
           </div>
           <h2

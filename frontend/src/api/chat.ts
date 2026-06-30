@@ -1,28 +1,43 @@
-import { getAccessToken } from './client'
+import { apiFetch } from './client'
+import type { Role } from '../types/chat'
+
+export interface ApiMessage {
+  id: string
+  role: Role
+  content: string
+  timestamp: string
+}
+
+export interface ApiSession {
+  id: string
+  title: string
+  timestamp: string
+  messages: ApiMessage[]
+}
+
+interface ChatResponse {
+  reply: string
+  sessionId: string
+}
+
+interface SessionsResponse {
+  sessions: ApiSession[]
+}
+
+export async function fetchChatSessions(): Promise<ApiSession[]> {
+  const data = await apiFetch<SessionsResponse>('/api/chat/sessions')
+  return data.sessions
+}
 
 export async function postChat(
-  sessionId: string,
+  sessionId: string | null,
   message: string,
-): Promise<string> {
-  const token = getAccessToken()
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (token) {
-    headers.Authorization = `Bearer ${token}`
-  }
-
-  const res = await fetch('/api/chat', {
+): Promise<ChatResponse> {
+  return apiFetch<ChatResponse>('/api/chat', {
     method: 'POST',
-    headers,
-    body: JSON.stringify({ sessionId, message }),
+    body: JSON.stringify({
+      sessionId: sessionId ?? 'new',
+      message,
+    }),
   })
-
-  if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as {
-      error?: string
-    } | null
-    throw new Error(body?.error ?? `Request failed (${res.status})`)
-  }
-
-  const data = (await res.json()) as { reply: string }
-  return data.reply
 }

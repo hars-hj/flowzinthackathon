@@ -34,7 +34,7 @@ export default function Deploy(): JSX.Element {
     <section id="deploy" ref={ref} className="py-16 sm:py-20 lg:py-25 px-5 sm:px-8 lg:px-15 scroll-mt-[68px]">
       <div className="max-w-[1100px] mx-auto">
         {/* Tag */}
-        <div className="fu text-[10.5px] font-semibold tracking-[2.2px] uppercase text-teal mb-5 before:content-['/\00a0'] before:opacity-50">
+        <div className="fu text-[10.5px] font-semibold tracking-[2.2px] uppercase text-teal mb-5 before:content-['/'] before:opacity-50">
           03 — Deploy
         </div>
 
