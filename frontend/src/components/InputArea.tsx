@@ -6,9 +6,10 @@ interface InputAreaProps {
   onChange: (value: string) => void
   onSend: (text: string) => void
   isLoading: boolean
+  disabled?: boolean
 }
 
-export function InputArea({ value, onChange, onSend, isLoading }: InputAreaProps) {
+export function InputArea({ value, onChange, onSend, isLoading, disabled = false }: InputAreaProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const adjustHeight = () => {
@@ -24,23 +25,29 @@ export function InputArea({ value, onChange, onSend, isLoading }: InputAreaProps
     adjustHeight()
   }, [value])
 
-
   const handleSend = () => {
-     console.log(value);
-      if (!value.trim() || isLoading) return
-     console.log(value);
+    if (!value.trim() || isLoading || disabled) return
     onSend(value)
-    
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault() // Prevents adding a newline in textarea when hitting Enter
+      e.preventDefault()
       handleSend()
     }
   }
 
-  const canSend = value.trim().length > 0 && !isLoading
+  const canSend = value.trim().length > 0 && !isLoading && !disabled
+
+  if (disabled) {
+    return (
+      <div className="border-t border-border bg-surface p-4">
+        <div className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface-muted px-4 py-4">
+          <span className="font-ui text-sm text-text-hint">This ticket has been resolved</span>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="border-t border-border bg-surface p-4">
@@ -52,12 +59,12 @@ export function InputArea({ value, onChange, onSend, isLoading }: InputAreaProps
           onKeyDown={handleKeyDown}
           placeholder="Ask a question..."
           rows={1}
-          disabled={isLoading}
+          disabled={isLoading || disabled}
           className="max-h-[112px] min-h-[22px] flex-1 resize-none bg-transparent font-ui text-base text-text-primary outline-none placeholder:text-text-hint disabled:opacity-50"
         />
         <button
           type="button"
-          onClick={handleSend} // Works flawlessly now
+          onClick={handleSend}
           disabled={!canSend}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-white transition-all duration-150 ease-in-out hover:bg-accent-dark active:scale-95 disabled:bg-border disabled:hover:bg-border"
           aria-label="Send message"

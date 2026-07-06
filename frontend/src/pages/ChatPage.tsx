@@ -20,6 +20,10 @@ export function ChatPage() {
     newChat,
     deleteConversation,
     formatRelativeTime,
+    escalateToAgent,
+    isEscalating,
+    ticketStatus,
+    isRestoringTicket,
   } = useChat()
 
   const bottomRef = useAutoScroll([messages, isLoading])
@@ -47,6 +51,10 @@ export function ChatPage() {
           }}
           isDeleteDisabled={!activeSessionId}
           onMenuOpen={() => setSidebarOpen(true)}
+          onEscalate={escalateToAgent}
+          isEscalating={isEscalating}
+          ticketStatus={ticketStatus}
+          isRestoringTicket={isRestoringTicket}
         />
         <MessageList
           messages={messages}
@@ -59,6 +67,7 @@ export function ChatPage() {
           onChange={setInputValue}
           onSend={sendMessage}
           isLoading={isLoading}
+          disabled={ticketStatus === 'resolved'}
         />
       </main>
     </div>

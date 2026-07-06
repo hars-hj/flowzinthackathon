@@ -1,0 +1,95 @@
+import { supabaseAdmin } from '../../lib/supabaseClient.js';
+
+export async function createTicket(sessionId: string, userQuestion: string) {
+  const { data, error } = await supabaseAdmin
+    .from('support_tickets')
+    .insert({ session_id: sessionId, user_question: userQuestion, status: 'waiting' })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function claimTicket(ticketId: string, agentId: string) {
+  const { data, error } = await supabaseAdmin
+    .from('support_tickets')
+    .update({ status: 'in_progress', assigned_agent_id: agentId, updated_at: new Date().toISOString() })
+    .eq('id', ticketId)
+    .eq('status', 'waiting')
+    .select()
+    .single();
+  if (error) throw error;
+  if (!data) throw new Error('Ticket already claimed');
+  return data;
+}
+
+export async function resolveTicket(ticketId: string) {
+  const { data, error } = await supabaseAdmin
+    .from('support_tickets')
+    .update({ status: 'resolved', updated_at: new Date().toISOString() })
+    .eq('id', ticketId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function getWaitingTickets() {
+  const { data, error } = await supabaseAdmin
+    .from('support_tickets')
+    .select('*')
+    .eq('status', 'waiting')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return data;
+}
+
+export async function getActiveTickets(agentId: string, role: string) {
+  let query = supabaseAdmin
+    .from('support_tickets')
+    .select('*')
+    .eq('status', 'in_progress');
+
+  if (role !== 'admin') {
+    query = query.eq('assigned_agent_id', agentId);
+  }
+
+  const { data, error } = await query.order('updated_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+export async function getResolvedTickets(agentId: string, role: string) {
+  let query = supabaseAdmin
+    .from('support_tickets')
+    .select('*')
+    .eq('status', 'resolved');
+
+  if (role !== 'admin') {
+    query = query.eq('assigned_agent_id', agentId);
+  }
+
+  const { data, error } = await query.order('updated_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+export async function sendTicketMessage(ticketId: string, senderId: string | null, senderRole: string, content: string) {
+  const { data, error } = await supabaseAdmin
+    .from('ticket_messages')
+    .insert({ ticket_id: ticketId, sender_id: senderId, sender_role: senderRole, content })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function getTicketMessages(ticketId: string) {
+  const { data, error } = await supabaseAdmin
+    .from('ticket_messages')
+    .select('*')
+    .eq('ticket_id', ticketId)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return data;
+}

@@ -85,6 +85,9 @@ export function AdminPage() {
           <button onClick={() => navigate('/analytics')} className='rounded-lg border border-border px-3 py-1.5 font-ui text-xs text-text-secondary transition-all duration-150 hover:bg-accent-light hover:text-accent'>
             Analytics
           </button>
+          <button onClick={() => navigate('/dashboard')} className='rounded-lg border border-border px-3 py-1.5 font-ui text-xs text-text-secondary transition-all duration-150 hover:bg-accent-light hover:text-accent'>
+            Tickets
+          </button>
           <button
             type="button"
             onClick={handleLogout}

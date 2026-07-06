@@ -4,9 +4,10 @@ import { useAuth } from '../context/AuthContext'
 interface ProtectedRouteProps {
   children: React.ReactNode
   adminOnly?: boolean
+  staffOnly?: boolean
 }
 
-export function ProtectedRoute({ children, adminOnly = false }: ProtectedRouteProps) {
+export function ProtectedRoute({ children, adminOnly = false, staffOnly = false }: ProtectedRouteProps) {
   const { user, isLoading } = useAuth()
   const location = useLocation()
 
@@ -23,6 +24,10 @@ export function ProtectedRoute({ children, adminOnly = false }: ProtectedRoutePr
   }
 
   if (adminOnly && user.role !== 'admin') {
+    return <Navigate to="/" replace />
+  }
+
+  if (staffOnly && !['agent', 'head', 'admin'].includes(user.role)) {
     return <Navigate to="/" replace />
   }
 

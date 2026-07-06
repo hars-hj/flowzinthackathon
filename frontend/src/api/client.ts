@@ -6,7 +6,8 @@ export interface StoredAuth {
   user: {
     id: string
     email: string
-    role?: 'user' | 'admin'
+    role?: 'user' | 'admin' | 'agent' | 'head'
+    team?: string | null
   }
 }
 
