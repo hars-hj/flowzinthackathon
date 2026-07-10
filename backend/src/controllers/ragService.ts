@@ -52,7 +52,7 @@ export async function embedQuery(question: string): Promise<number[]> {
 
 async function rerankChunks(question: string, chunks: Chunk[]): Promise<Chunk[]> {
   if(chunks.length<2) return chunks;
-  console.log("RERANKING STARTED")
+ // console.log("RERANKING STARTED")
   const scores= await Promise.all(
     chunks.map(async (chunk)=> {
       const response= await groq.chat.completions.create({
@@ -75,12 +75,14 @@ async function rerankChunks(question: string, chunks: Chunk[]): Promise<Chunk[]>
       return { chunk, score: isNaN(score) ? 5 : score };  // default 5 not 0
     })
   );
-  console.log("RERANKING ENDED: ", scores)
+ // console.log("RERANKING ENDED: ", scores)
   return scores.sort((a, b)=> b.score-a.score).map((s) => s.chunk);
 }
 
 export async function retrieveChunks(queryEmbedding: number[], keywords: string): Promise<Chunk[]> {
-  console.log("RETRIEVE CHUNKS")
+ // console.log("RETRIEVE CHUNKS")
+
+  // keyword search (supabase full text search) and vector search (supabase pgvector) in parallel, then combine results using Reciprocal Rank Fusion (RRF)
   const [vectorResults, keywordResults]= await Promise.all([
     supabaseAdmin.rpc("match_chunks", {
       query_embedding: queryEmbedding,
@@ -119,7 +121,7 @@ export async function retrieveChunks(queryEmbedding: number[], keywords: string)
       scores.set(key, { chunk: { ...chunk, similarity: 0 }, score: rrfScore });
     }
   });
-  console.log("RETRIEVE CHUNKS ENDED", scores)
+ // console.log("RETRIEVE CHUNKS ENDED", scores)
   return Array.from(scores.values()).sort((a, b)=> b.score - a.score).slice(0, 5).map((s)=> s.chunk);
 }
 
@@ -144,12 +146,12 @@ async function saveMessage(sessionId: string, role: "user" | "assistant", conten
 }
 
 //  Build the prompt and call the LLM 
-async function generateAnswer(
+export async function generateAnswer(
   question: string,
   chunks: Chunk[],
   history: Message[]
 ): Promise<string> {
-  console.log("GENERATE ANSWER CALLED")
+ // console.log("GENERATE ANSWER CALLED")
   const context = chunks
     .map((c, i) => `[Source ${i + 1}: ${c.filename}, page ${c.page}]\n${c.content}`)
     .join("\n\n---\n\n");
@@ -181,7 +183,7 @@ ${context}`;
     max_tokens: 1024,
     temperature: 0.1,
   });
-  console.log("GENERATE ANSWER ENDED", response.choices[0].message)
+ // console.log("GENERATE ANSWER ENDED", response.choices[0].message)
   return response.choices[0].message.content ?? "Sorry, I could not generate a response.";
 }
 
