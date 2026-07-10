@@ -131,7 +131,7 @@ async function getConversationHistory(sessionId: string, limit = 10): Promise<Me
     .from("conversations")
     .select("role, content")
     .eq("session_id", sessionId)
-    .order("created_at", { ascending: false })
+    .order("seq", { ascending: false })
     .limit(limit);
 
   if (error) throw new Error(`History fetch failed: ${error.message}`);
@@ -140,8 +140,25 @@ async function getConversationHistory(sessionId: string, limit = 10): Promise<Me
   return (data as Message[]).reverse();
 }
 
+async function getNextConversationSeq(sessionId: string): Promise<number> {
+  const { data, error } = await supabaseAdmin
+    .from("conversations")
+    .select("seq")
+    .eq("session_id", sessionId)
+    .order("seq", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to determine next seq: ${error.message}`);
+  }
+
+  return ((data as { seq: number } | null)?.seq ?? 0) + 1;
+}
+
 //  Save a message to conversation history 
 async function saveMessage(sessionId: string, role: "user" | "assistant", content: string) {
+  
   await supabaseAdmin.from("conversations").insert({ session_id: sessionId, role, content });
 }
 
@@ -219,7 +236,7 @@ export async function chat(sessionId: string, question: string): Promise<string>
       getConversationHistory(sessionId),
     ]);
 
-    if(!rawChunks || rawChunks.length=== 0){
+    if (!rawChunks || rawChunks.length === 0) {
       await saveMessage(sessionId, "user", question);
       await saveMessage(sessionId, "assistant", NO_CONTEXT_ANSWER);
       await logQuery({
@@ -228,27 +245,25 @@ export async function chat(sessionId: string, question: string): Promise<string>
         chunksRetrieved: 0,
         topChunkScore: 0,
         finalAnswer: NO_CONTEXT_ANSWER,
-        latencyMs: Date.now()- start,
+        latencyMs: Date.now() - start,
         escalated: false,
       });
       return NO_CONTEXT_ANSWER;
     }
 
-    const chunks= await rerankChunks(question, rawChunks);
-    const answer= await generateAnswer(question, chunks, history);
-    await Promise.all([
-      saveMessage(sessionId, "user", question),
-      saveMessage(sessionId, "assistant", answer),
-      logQuery({
-        sessionId,
-        question,
-        chunksRetrieved: chunks.length,
-        topChunkScore: chunks[0]?.similarity ?? 0,
-        finalAnswer: answer,
-        latencyMs: Date.now() - start,
-        escalated: false,
-      }),
-    ]);
+    const chunks = await rerankChunks(question, rawChunks);
+    const answer = await generateAnswer(question, chunks, history);
+    await saveMessage(sessionId, "user", question);
+    await saveMessage(sessionId, "assistant", answer);
+    await logQuery({
+      sessionId,
+      question,
+      chunksRetrieved: chunks.length,
+      topChunkScore: chunks[0]?.similarity ?? 0,
+      finalAnswer: answer,
+      latencyMs: Date.now() - start,
+      escalated: false,
+    });
 
     console.log("CHATEND");
     return answer;

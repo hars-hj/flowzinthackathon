@@ -137,9 +137,9 @@ export async function getSessionsHandler(req: AuthenticatedRequest, res: Respons
 
   const { data: conversations, error: convError } = await supabaseAdmin
     .from('conversations')
-    .select('id, session_id, role, content, created_at')
+    .select('id, session_id, role, content, created_at,seq')
     .in('session_id', sessionIds)
-    .order('created_at', { ascending: true });
+    .order('seq', { ascending: true });
 
   if (convError) {
     res.status(500).json({ error: convError.message });
