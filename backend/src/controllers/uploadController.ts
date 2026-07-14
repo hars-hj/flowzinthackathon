@@ -4,7 +4,7 @@ import FormData from "form-data";
 import {chunkMarkdown} from "./chunkService.js";
 import { embedChunks } from "./embeddingService.js";
 import { storeEmbeddings } from "./embeddingToDb.js";
-import { supabaseAdmin } from "../../lib/supabaseClient.js";
+import { supabaseAdmin } from "../lib/supabaseClient.js";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 
  async function uploadFile(req: express.Request, res: express.Response) {

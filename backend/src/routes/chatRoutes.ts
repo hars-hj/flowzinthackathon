@@ -1,33 +1,36 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth.middleware.js';
 import { requireUser } from '../middleware/role.middleware.js';
-import { chatHandler, getSessionsHandler, deleteSessionHandler } from '../controllers/chatbotController.js';
+//import { chatHandler, getSessionsHandler, deleteSessionHandler } from '../controllers/chatbotController.js';
 import { embedQuery, retrieveChunks ,chat} from '../controllers/ragService.js';
-import { supabaseAdmin } from '../../lib/supabaseClient.js';
+import { supabaseAdmin } from '../lib/supabaseClient.js';
+import { chatHandler } from '../controllers/chatController.widget.js';
 const router = express.Router();
 
-router.get('/sessions', authenticateToken, getSessionsHandler);
-router.post('/', authenticateToken, chatHandler);
-router.delete('/:sessionId', authenticateToken, deleteSessionHandler);
+router.post('/', chatHandler);
+
+//router.get('/sessions', authenticateToken, getSessionsHandler);
+// router.post('/', authenticateToken, chatHandler);
+//router.delete('/:sessionId', authenticateToken, deleteSessionHandler);
 
 // route to test the RAG based bot response with debug information
-router.post("/debug", async (req, res) => {
-  const { message, sessionId }=req.body;
-  const embedding = await embedQuery(message);
-  const keywords = message.split(" ").slice(0, 6).join(" | ");
-  const chunks = await retrieveChunks(embedding, keywords);
-  const answer = await chat(sessionId, message);
-  res.json({
-    question: message,
-    retrieved: chunks.map(c => ({
-      similarity: c.similarity.toFixed(3),
-      source: c.filename,
-      page: c.page,
-      preview: c.content.slice(0, 200) + "...",
-    })),
-    response: answer,
-  });
-});
+// router.post("/debug", async (req, res) => {
+//   const { message, sessionId }=req.body;
+//   const embedding = await embedQuery(message);
+//   const keywords = message.split(" ").slice(0, 6).join(" | ");
+//   const chunks = await retrieveChunks(embedding, keywords);
+//   const answer = await chat(sessionId, message);
+//   res.json({
+//     question: message,
+//     retrieved: chunks.map(c => ({
+//       similarity: c.similarity.toFixed(3),
+//       source: c.filename,
+//       page: c.page,
+//       preview: c.content.slice(0, 200) + "...",
+//     })),
+//     response: answer,
+//   });
+// });
 
 router.get("/analytics", authenticateToken, async (req, res) => {
   const { data, error } = await supabaseAdmin

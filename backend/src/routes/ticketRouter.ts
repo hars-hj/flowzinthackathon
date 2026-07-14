@@ -7,7 +7,7 @@ import {
   getWaitingTickets, getActiveTickets, getResolvedTickets,
   sendTicketMessage, getTicketMessages
 } from '../controllers/ticket.controller.js';
-import { supabaseAdmin } from '../../lib/supabaseClient.js';
+import { supabaseAdmin } from '../lib/supabaseClient.js';
 
 const router = express.Router();
 

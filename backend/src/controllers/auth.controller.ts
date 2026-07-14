@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { supabaseAnon, supabaseAdmin } from '../../lib/supabaseClient.js';
+import { supabaseAnon, supabaseAdmin } from '../lib/supabaseClient.js';
 import type { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 
 export async function register(req: Request, res: Response) {

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
-import { supabaseAdmin } from '../../lib/supabaseClient.js';
+import { supabaseAdmin } from '../lib/supabaseClient.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const JWKS = createRemoteJWKSet(

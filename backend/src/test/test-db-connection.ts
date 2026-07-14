@@ -1,4 +1,4 @@
-import { supabaseAdmin } from "../../lib/supabaseClient.js"
+import { supabaseAdmin } from "../lib/supabaseClient.js"
 type ConversationInsert = {
   session_id: string
   role: string

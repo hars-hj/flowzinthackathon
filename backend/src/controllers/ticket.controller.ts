@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '../../lib/supabaseClient.js';
+import { supabaseAdmin } from '../lib/supabaseClient.js';
 
 export async function createTicket(sessionId: string, userQuestion: string) {
   const { data, error } = await supabaseAdmin
