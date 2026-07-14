@@ -9,7 +9,7 @@
   }
 
   const BASE_URL = 'http://localhost:4000'; // Replace with actual backend URL
-  console.log('YourBot widget: loading for org', `${BASE_URL}/api/widget-config?key=${orgKey}`);
+
   // 2. Fetch widget config (theme, position, etc.) before rendering anything
   fetch(`${BASE_URL}/api/widget-config?key=${orgKey}`)
 

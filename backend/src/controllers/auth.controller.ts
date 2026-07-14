@@ -25,6 +25,7 @@ export async function registerAdmin(req: Request, res: Response) {
   if (adminSecret !== process.env.ADMIN_REGISTRATION_SECRET) {
     return res.status(403).json({ error: 'Invalid admin secret' });
   }
+  console.log(email,password);
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required' });

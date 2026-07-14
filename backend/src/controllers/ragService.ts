@@ -36,6 +36,7 @@ const FALLBACK_ANSWER = "Sorry, I'm having trouble answering right now — pleas
 
 // --- Embed the user's question ---
 export async function embedQuery(question: string): Promise<number[]> {
+  console.log("[ragService] embedQuery started", { question });
   const result = await embeddingsModel.models.embedContent({
     model: "gemini-embedding-001",
     contents: question,
@@ -46,14 +47,20 @@ export async function embedQuery(question: string): Promise<number[]> {
     result.embeddings.length === 0 ||
     !result.embeddings[0].values
   ) {
+    console.log("[ragService] embedQuery failed: no embeddings returned");
     throw new Error("Embedding generation failed.");
   }
 
+  console.log("[ragService] embedQuery completed", { embeddingLength: result.embeddings[0].values.length });
   return result.embeddings[0].values;
 }
 
 async function rerankChunks(question: string, chunks: Chunk[]): Promise<Chunk[]> {
-  if (chunks.length < 2) return chunks;
+  console.log("[ragService] rerankChunks started", { question, chunkCount: chunks.length });
+  if (chunks.length < 2) {
+    console.log("[ragService] rerankChunks skipped because fewer than 2 chunks were retrieved");
+    return chunks;
+  }
 
   const scores = await Promise.all(
     chunks.map(async (chunk) => {
@@ -78,7 +85,9 @@ async function rerankChunks(question: string, chunks: Chunk[]): Promise<Chunk[]>
     })
   );
 
-  return scores.sort((a, b) => b.score - a.score).map((s) => s.chunk);
+  const reranked = scores.sort((a, b) => b.score - a.score).map((s) => s.chunk);
+  console.log("[ragService] rerankChunks completed", { rerankedCount: reranked.length, topChunk: reranked[0]?.filename });
+  return reranked;
 }
 
 // NOTE: match_chunks RPC must be updated in Postgres to accept and filter
@@ -87,6 +96,7 @@ export async function retrieveChunks(
   queryEmbedding: number[],
   keywords: string
 ): Promise<Chunk[]> {
+  console.log("[ragService] retrieveChunks started", { orgId, keywords, embeddingLength: queryEmbedding.length });
   const [vectorResults, keywordResults] = await Promise.all([
     supabaseAdmin.rpc("match_chunks", {
       query_embedding: queryEmbedding,
@@ -130,11 +140,18 @@ export async function retrieveChunks(
     }
   });
 
-  return Array.from(scores.values()).sort((a, b) => b.score - a.score).slice(0, 5).map((s) => s.chunk);
+  const mergedChunks = Array.from(scores.values()).sort((a, b) => b.score - a.score).slice(0, 5).map((s) => s.chunk);
+  console.log("[ragService] retrieveChunks completed", {
+    vectorResults: vectorResults.data?.length ?? 0,
+    keywordResults: keywordResults.data?.length ?? 0,
+    mergedCount: mergedChunks.length,
+  });
+  return mergedChunks;
 }
 
 // --- Fetch the last N messages for this session, scoped to org ---
 async function getConversationHistory(orgId: string, sessionId: string, limit = 10): Promise<Message[]> {
+  console.log("[ragService] getConversationHistory started", { orgId, sessionId, limit });
   const { data, error } = await supabaseAdmin
     .from("conversations")
     .select("role, content")
@@ -145,11 +162,14 @@ async function getConversationHistory(orgId: string, sessionId: string, limit = 
 
   if (error) throw new Error(`History fetch failed: ${error.message}`);
 
-  return (data as Message[]).reverse();
+  const history = (data as Message[]).reverse();
+  console.log("[ragService] getConversationHistory completed", { historyLength: history.length });
+  return history;
 }
 
 // --- Save a message to conversation history ---
 async function saveMessage(orgId: string, sessionId: string, role: "user" | "assistant", content: string) {
+  console.log("[ragService] saveMessage", { orgId, sessionId, role, contentLength: content.length });
   await supabaseAdmin.from("conversations").insert({ org_id: orgId, session_id: sessionId, role, content });
 }
 
@@ -185,6 +205,7 @@ ${context}`;
     { role: "user", content: question },
   ];
 
+  console.log("[ragService] generateAnswer started", { question, chunkCount: chunks.length, historyLength: history.length });
   const response = await groq.chat.completions.create({
     model: "llama-3.3-70b-versatile",
     messages,
@@ -192,7 +213,9 @@ ${context}`;
     temperature: 0.1,
   });
 
-  return response.choices[0].message.content ?? "Sorry, I could not generate a response.";
+  const answer = response.choices[0].message.content ?? "Sorry, I could not generate a response.";
+  console.log("[ragService] generateAnswer completed", { answerLength: answer.length });
+  return answer;
 }
 
 async function logQuery(data: {
@@ -231,19 +254,23 @@ async function getSupportContact(orgId: string): Promise<string> {
 // --- Main exported function: the full RAG pipeline, org-scoped ---
 export async function chat(orgId: string, sessionId: string, question: string): Promise<ChatResult> {
   const start = Date.now();
+  console.log("[ragService] chat started", { orgId, sessionId, question });
   try {
     const [queryEmbedding, supportContact] = await Promise.all([
       embedQuery(question),
       getSupportContact(orgId),
     ]);
+    console.log("[ragService] embedding and support contact resolved", { supportContact });
     const keywords = question.split(" ").slice(0, 6).join(" | ");
 
     const [rawChunks, history] = await Promise.all([
       retrieveChunks(orgId, queryEmbedding, keywords),
       getConversationHistory(orgId, sessionId),
     ]);
+    console.log("[ragService] retrieved chunks and history", { rawChunkCount: rawChunks.length, historyLength: history.length });
 
     if (!rawChunks || rawChunks.length === 0) {
+      console.log("[ragService] no chunks found, returning no-context answer");
       await saveMessage(orgId, sessionId, "user", question);
       await saveMessage(orgId, sessionId, "assistant", NO_CONTEXT_ANSWER);
       await logQuery({
@@ -261,6 +288,7 @@ export async function chat(orgId: string, sessionId: string, question: string): 
 
     const chunks = await rerankChunks(question, rawChunks);
     const answer = await generateAnswer(question, chunks, history, supportContact);
+    console.log("[ragService] answer generated", { answerLength: answer.length });
 
     await saveMessage(orgId, sessionId, "user", question);
     await saveMessage(orgId, sessionId, "assistant", answer);
@@ -275,9 +303,10 @@ export async function chat(orgId: string, sessionId: string, question: string): 
       escalated: false, // TODO: wire in your escalation-detection model's result here
     });
 
+    console.log("[ragService] chat completed", { latencyMs: Date.now() - start, escalated: false });
     return { reply: answer, escalated: false };
   } catch (err) {
-    console.error("RAG chat pipeline failed:", err);
+    console.error("[ragService] chat pipeline failed:", err);
     return { reply: FALLBACK_ANSWER, escalated: false };
   }
 }

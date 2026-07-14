@@ -12,11 +12,12 @@ interface chunks {
     }
     
 }
-export async function storeEmbeddings(chunks: chunks[]) {
+export async function storeEmbeddings(chunks: chunks[],org_id:string) {
    
     const doc_id = uuidv4();
     const rows = chunks.map((chunk) => ({
         document_id: doc_id,
+        org_id: org_id,
         filename: chunk.metadata.filename,
         chunk_index: chunk.metadata.chunkIndex,
         page: chunk.metadata.page,
