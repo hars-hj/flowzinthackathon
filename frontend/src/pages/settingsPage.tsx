@@ -27,6 +27,7 @@ const DEFAULT_CONFIG: Omit<WidgetConfig, 'org_id' | 'updated_at'> = {
   bubble_position: 'bottom-right',
   show_history_tab: true,
   escalation_enabled: true,
+    support_email: 'contact@support',
 }
 
 export function SettingsPage() {
@@ -63,6 +64,7 @@ export function SettingsPage() {
           bubble_position: data.widgetConfig.bubble_position ?? DEFAULT_CONFIG.bubble_position,
           show_history_tab: data.widgetConfig.show_history_tab ?? true,
           escalation_enabled: data.widgetConfig.escalation_enabled ?? true,
+          support_email: data.widgetConfig.support_email ?? DEFAULT_CONFIG.support_email,
         })
       }
     } catch (err) {
@@ -387,6 +389,22 @@ export function SettingsPage() {
                     Allow escalation to human agent
                   </label>
                 </div>
+
+                 <div>
+                  <label className="mb-1 block font-ui text-xs font-medium text-text-secondary">
+                    Support Email
+                  </label>
+                  <input
+                    type="text"
+                    value={config.support_email ?? ''}
+                    onChange={(e) =>
+                      setConfig((prev) => ({ ...prev, support_email: e.target.value }))
+                    }
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 font-ui text-sm text-text-primary outline-none transition-all duration-150 focus:border-accent"
+                  />
+                </div>
+
+                
 
                 <div className="sm:col-span-2">
                   <label className="mb-1 block font-ui text-xs font-medium text-text-secondary">

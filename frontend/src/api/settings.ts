@@ -18,6 +18,7 @@ export interface WidgetConfig {
   show_history_tab: boolean | null
   escalation_enabled: boolean | null
   updated_at: string | null
+  support_email: string | null
 }
 
 export interface SettingsResponse {

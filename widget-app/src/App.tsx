@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import Header from "./Header";
-import ChatPanel from "./ChatPanel";
+import ChatPanel, { TypingDots } from "./ChatPanel";
 import { v4 as uuidv4 } from "uuid";
 
 
@@ -37,7 +37,20 @@ function App() {
     setSessionId(existing);
   }, []);
 
-  if (!config) return <div>Loading...</div>;
+  if (!config)
+    return (
+      <div
+        style={{
+          boxSizing: "border-box",
+          height: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <TypingDots />
+      </div>
+    );
 
   return (
     <div

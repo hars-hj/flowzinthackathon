@@ -29,9 +29,9 @@ function normalizeMessage(raw: RawMessage): Message {
 }
 
 // Three-dot "typing" indicator — dots rise and fall one after another.
-function TypingDots() {
+export function TypingDots() {
   return (
-    <div className="typing-dots" aria-label="Bot is typing">
+    <div className="typing-dots" aria-label="Loading">
       <span />
       <span />
       <span />
