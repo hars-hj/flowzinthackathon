@@ -29,23 +29,33 @@
 
     // 3. Create the floating bubble button
     const bubble = document.createElement('button');
-    bubble.id = 'yourbot-bubble';
-    bubble.innerHTML = '💬'; // replace with an SVG icon or config.avatar_url later
-    bubble.style.cssText = `
-      position: fixed;
-      bottom: 20px;
-      ${positionStyles}
-      width: 60px;
-      height: 60px;
-      border-radius: 50%;
-      background-color: ${config.primary_color || '#5A2EFF'};
-      color: white;
-      border: none;
-      font-size: 24px;
-      cursor: pointer;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      z-index: 999998;
-    `;
+bubble.id = 'yourbot-bubble';
+
+// Use the configured avatar if one is set, otherwise fall back to the emoji icon
+bubble.innerHTML = config.avatar_url
+  ? `<img src="${config.avatar_url}" alt="" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" />`
+  : '💬';
+
+bubble.style.cssText = `
+  position: fixed;
+  bottom: 20px;
+  ${positionStyles}
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background-color: ${config.primary_color || '#5A2EFF'};
+  color: white;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  z-index: 999998;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
 
     document.body.appendChild(bubble);
 

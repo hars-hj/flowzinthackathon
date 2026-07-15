@@ -6,6 +6,39 @@ interface Message {
   sources?: unknown;
 }
 
+// Raw shape as it may come back from the history endpoint — DB rows use
+// `role` ("user" | "assistant" / "bot") and sometimes `text` instead of
+// `content`. Normalize everything to the `Message` shape the UI expects.
+interface RawMessage {
+  sender?: string;
+  role?: string;
+  content?: string;
+  text?: string;
+  sources?: unknown;
+}
+
+function normalizeMessage(raw: RawMessage): Message {
+  const senderSource = raw.sender ?? raw.role ?? "bot";
+  const sender: Message["sender"] = senderSource === "user" ? "user" : "bot";
+
+  return {
+    sender,
+    content: raw.content ?? raw.text ?? "",
+    sources: raw.sources,
+  };
+}
+
+// Three-dot "typing" indicator — dots rise and fall one after another.
+function TypingDots() {
+  return (
+    <div className="typing-dots" aria-label="Bot is typing">
+      <span />
+      <span />
+      <span />
+    </div>
+  );
+}
+
 interface ChatConfig {
   primary_color?: string;
   welcome_message?: string;
@@ -29,8 +62,8 @@ function ChatPanel({ orgKey, sessionId, config }: ChatPanelProps) {
 
     fetch(`/api/conversations?org=${orgKey}&session_id=${sessionId}`)
       .then((res) => res.json())
-      .then((data: { messages?: Message[] }) =>
-        setMessages(data.messages || [])
+      .then((data: { messages?: RawMessage[] }) =>
+        setMessages((data.messages || []).map(normalizeMessage))
       );
   }, [sessionId, orgKey]);
 
@@ -65,11 +98,11 @@ function ChatPanel({ orgKey, sessionId, config }: ChatPanelProps) {
 
     setMessages((prev) => [
       ...prev,
-      {
+      normalizeMessage({
         sender: "bot",
         content: data.reply,
         sources: data.sources,
-      },
+      }),
     ]);
 
     setLoading(false);
@@ -140,7 +173,20 @@ function ChatPanel({ orgKey, sessionId, config }: ChatPanelProps) {
           </div>
         ))}
 
-        {loading && <p style={{ color: "#999" }}>Typing...</p>}
+        {loading && (
+          <div style={{ textAlign: "left", margin: "8px 0" }}>
+            <span
+              style={{
+                display: "inline-block",
+                padding: "10px 14px",
+                borderRadius: "12px",
+                background: "#f1f1f1",
+              }}
+            >
+              <TypingDots />
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Input box */}

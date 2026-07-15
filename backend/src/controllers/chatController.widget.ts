@@ -49,19 +49,19 @@ export async function chatHandler(req: Request, res: Response): Promise<void> {
 
         const { reply, escalated } = await chat(orgId, sessionId, userMessage);
 
-        const { error: botInsertError } = await supabaseAdmin.from('conversations').insert({
-        org_id: orgId,
-        session_id: sessionId,
-        role: 'assistant',   // matches this file's convention — not 'bot'
-        content: reply,
-        escalated: escalated ?? false,
+        // const { error: botInsertError } = await supabaseAdmin.from('conversations').insert({
+        // org_id: orgId,
+        // session_id: sessionId,
+        // role: 'assistant',   // matches this file's convention — not 'bot'
+        // content: reply,
+        // escalated: escalated ?? false,
        
-        });
+        // });
 
-    if (botInsertError) {
-      console.error('Error saving bot message:', botInsertError);
+    // if (botInsertError) {
+    //   console.error('Error saving bot message:', botInsertError);
      
-    }
+    // }
 
     res.json({ reply, sessionId, escalated: escalated ?? false });
   } catch (error) {
