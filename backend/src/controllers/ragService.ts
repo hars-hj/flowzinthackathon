@@ -168,7 +168,7 @@ async function getConversationHistory(orgId: string, sessionId: string, limit = 
 }
 
 // --- Save a message to conversation history ---
-async function saveMessage(orgId: string, sessionId: string, role: "user" | "assistant", content: string) {
+export async function saveMessage(orgId: string, sessionId: string, role: "user" | "assistant", content: string) {
   console.log("[ragService] saveMessage", { orgId, sessionId, role, contentLength: content.length });
   await supabaseAdmin.from("conversations").insert({ org_id: orgId, session_id: sessionId, role, content });
 }
@@ -218,7 +218,7 @@ ${context}`;
   return answer;
 }
 
-async function logQuery(data: {
+export async function logQuery(data: {
   orgId: string;
   sessionId: string;
   question: string;

@@ -74,6 +74,7 @@ export async function updateWidgetConfig(req: AuthenticatedRequest, res: Respons
     bubble_position,
     show_history_tab,
     escalation_enabled,
+    support_email,
   } = req.body;
 
   const { data, error } = await supabaseAdmin
@@ -89,6 +90,7 @@ export async function updateWidgetConfig(req: AuthenticatedRequest, res: Respons
         bubble_position,
         show_history_tab,
         escalation_enabled,
+        support_email,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'org_id' }

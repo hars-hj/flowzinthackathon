@@ -2,6 +2,9 @@ import { Request, Response } from 'express';
 import { supabaseAdmin, supabaseAnon } from '../lib/supabaseClient.js';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 
+
+///////////////  frontend for this file is yet to be implemented. /////////////////////////
+
 export async function createAgent(req: AuthenticatedRequest, res: Response) {
   // match whatever your middleware actually sets.
   const adminUserId = req.user?.id;

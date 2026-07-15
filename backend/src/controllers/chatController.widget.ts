@@ -2,7 +2,8 @@ import { json, Request, Response } from 'express';
 import { randomUUID } from 'crypto';
 import { supabaseAdmin } from '../lib/supabaseClient.js';
 import { chat } from './ragService.js'; 
-
+import {handleCasualQuery} from './casualQueryHandler.js';
+import { saveMessage, logQuery } from './ragService.js';
 interface ChatRequestBody {
   widget_key: string;
   session_id?: string;
@@ -12,7 +13,7 @@ interface ChatRequestBody {
 
 export async function chatHandler(req: Request, res: Response): Promise<void> {
 
-
+  const start = Date.now();
   const { widget_key: widgetKey, session_id: session_id, message, question } = req.body;
   const userMessage = (message ?? question)?.trim();
 
@@ -45,9 +46,32 @@ export async function chatHandler(req: Request, res: Response): Promise<void> {
     const orgId = org.id as string;
 
     // 3. Generate the bot's reply, scoped to this org's documents/chunks.
- 
 
-        const { reply, escalated } = await chat(orgId, sessionId, userMessage);
+
+    // handle casual response.
+    const casualResponse = handleCasualQuery(userMessage);
+    console.log("[chatHandler] casualResponse", { casualResponse });
+    if (casualResponse.ok) {
+       await saveMessage(orgId, sessionId, "user", userMessage);
+      await saveMessage(orgId, sessionId, "assistant", casualResponse.message);
+      await logQuery({
+        orgId,
+        sessionId,
+        question,
+        chunksRetrieved: 0,
+        topChunkScore: 0,
+        finalAnswer: casualResponse.message,
+        latencyMs: Date.now() - start,
+        escalated: false,
+      });
+
+      res.json({ reply: casualResponse.message, sessionId, escalated: false });
+      return;
+    }
+
+
+    // call to RAG service to get the answer based on the org's documents/chunks
+    const { reply, escalated } = await chat(orgId, sessionId, userMessage);
 
         // const { error: botInsertError } = await supabaseAdmin.from('conversations').insert({
         // org_id: orgId,
