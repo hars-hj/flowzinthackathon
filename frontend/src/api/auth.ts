@@ -39,22 +39,22 @@ export async function loginUser(email: string, password: string): Promise<AuthUs
   return fetchMe()
 }
 
-export async function registerUser(email: string, password: string): Promise<void> {
-  await apiFetch<{ message: string }>('/api/auth/register', {
-    method: 'POST',
-    body: JSON.stringify({ email, password }),
-  })
-}
+// export async function registerUser(email: string, password: string): Promise<void> {
+//   await apiFetch<{ message: string }>('/api/auth/register', {
+//     method: 'POST',
+//     body: JSON.stringify({ email, password }),
+//   })
+// }
 
 
 export async function registerAdmin(
   email: string,
   password: string,
-  adminSecret: string,
+  organizationName:string,
 ): Promise<void> {
   await apiFetch<{ message: string }>('/api/auth/admin/register', {
     method: 'POST',
-    body: JSON.stringify({ email, password, adminSecret }),
+    body: JSON.stringify({ email, password, organizationName }),
   })
 }
 

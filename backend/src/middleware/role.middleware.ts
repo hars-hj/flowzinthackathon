@@ -12,14 +12,14 @@ export function requireAdmin(
   next();
 }
 
-export function requireUser(
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-) {
-  if (!req.user) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-  // Both 'user' and 'admin' can access user-level routes
-  next();
-}
+// export function requireUser(
+//   req: AuthenticatedRequest,
+//   res: Response,
+//   next: NextFunction
+// ) {
+//   if (!req.user) {
+//     return res.status(401).json({ error: 'Authentication required' });
+//   }
+//   // Both 'user' and 'admin' can access user-level routes
+//   next();
+// }

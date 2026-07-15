@@ -1,20 +1,18 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { registerAdmin, registerUser } from '../api/auth'
+import { registerAdmin } from '../api/auth'
 import {
   AuthButton,
   AuthError,
   AuthField,
   AuthLayout,
-  RoleToggle,
 } from '../components/auth/AuthLayout'
 
 export function SignupPage() {
   const navigate = useNavigate()
-  const [role, setRole] = useState<'user' | 'admin'>('user')
+  const [organizationName, setOrganizationName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [adminSecret, setAdminSecret] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -26,13 +24,10 @@ export function SignupPage() {
     setIsLoading(true)
 
     try {
-      if (role === 'admin') {
-        await registerAdmin(email, password, adminSecret)
-        setSuccess('Admin account created. You can sign in now.')
-      } else {
-        await registerUser(email, password)
-        setSuccess('Registration successful. Check your email to confirm, then sign in.')
-      }
+      // NOTE: registerAdmin's signature will need to be updated once the
+      // backend changes land — passing organizationName in place of adminSecret.
+      await registerAdmin(email, password, organizationName)
+      setSuccess('Admin account created. You can sign in now.')
       setTimeout(() => navigate('/login', { replace: true }), 2000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed')
@@ -55,13 +50,19 @@ export function SignupPage() {
       }
     >
       <form onSubmit={handleSubmit}>
-        <RoleToggle value={role} onChange={setRole} />
         <AuthError message={error} />
         {success && (
           <p className="mb-4 rounded-lg bg-accent-light px-3 py-2 font-ui text-sm text-accent-dark">
             {success}
           </p>
         )}
+        <AuthField
+          label="Organization name"
+          type="text"
+          value={organizationName}
+          onChange={setOrganizationName}
+          placeholder="Acme Inc."
+        />
         <AuthField
           label="Email"
           type="email"
@@ -76,15 +77,6 @@ export function SignupPage() {
           onChange={setPassword}
           placeholder="Create a password"
         />
-        {role === 'admin' && (
-          <AuthField
-            label="Admin secret code"
-            type="password"
-            value={adminSecret}
-            onChange={setAdminSecret}
-            placeholder="Enter admin registration secret"
-          />
-        )}
         <AuthButton isLoading={isLoading}>Create account</AuthButton>
       </form>
     </AuthLayout>

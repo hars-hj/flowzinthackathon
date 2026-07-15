@@ -12,6 +12,7 @@ import ticketRoutes from './routes/ticketRouter.js';
 import { initSocket } from './socket.js';
 import widgetConfigRouter from './routes/widgetRouter.js';
 import conversationRoutes from './routes/conversations.js';
+import settingRouter from './routes/setting.js';
 import path from 'path/win32';
 const app = express();
 const port = process.env.PORT || 4000;
@@ -40,6 +41,8 @@ app.use('/api/widget-config', widgetConfigRouter);
 // widget testing 
 app.use(express.static(path.join(__dirname, "../public")));+
 app.use('/api/conversations',conversationRoutes);
+app.use('/api/settings', settingRouter);
+
 
 app.get('/', (req: Request, res: Response) => {
   res.send({ status: 'backend running', message: 'Chatbot API is available at /api/chat' });

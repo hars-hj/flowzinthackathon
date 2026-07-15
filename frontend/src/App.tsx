@@ -7,7 +7,7 @@ import { ProtectedRoute } from './components/ProtectedRoute'
 import { AdminPage } from './pages/AdminPage'
 import { AnalyticsPage } from './pages/AnalyticsPage'
 import { AgentDashboard } from './pages/AgentDashBoard'
-
+import { SettingsPage } from './pages/settingsPage'
 function App() {
   return (
     <Routes>
@@ -54,6 +54,15 @@ function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute adminOnly>
+            <SettingsPage />
+          </ProtectedRoute>
+        }
+      />
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
