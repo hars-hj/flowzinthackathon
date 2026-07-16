@@ -163,8 +163,8 @@ export function TicketChatPanel({ ticket, currentUser, onBack }: TicketChatPanel
                       {msg.sender_role}
                     </span>
                   )}
-                  <div
-                    className={`max-w-md rounded-2xl px-4 py-2.5 font-message text-sm ${
+                 <div
+                    className={`max-w-md rounded-2xl px-4 py-2.5 font-message text-sm whitespace-pre-wrap break-words ${
                       isUser
                         ? 'bg-surface-muted text-text-primary'
                         : isMine

@@ -8,6 +8,8 @@ import { AdminPage } from './pages/AdminPage'
 import { AnalyticsPage } from './pages/AnalyticsPage'
 import { AgentDashboard } from './pages/AgentDashBoard'
 import { SettingsPage } from './pages/settingsPage'
+import {AgentOnlyDashboard} from './pages/AgentsPage'
+
 function App() {
   return (
     <Routes>
@@ -61,6 +63,15 @@ function App() {
             <SettingsPage />
           </ProtectedRoute>
         }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute staffOnly>
+            <AgentOnlyDashboard />
+          </ProtectedRoute>
+        }
+       
       />
 
       <Route path="*" element={<Navigate to="/" replace />} />

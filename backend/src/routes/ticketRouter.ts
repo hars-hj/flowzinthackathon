@@ -2,24 +2,109 @@ import express from 'express';
 import { authenticateToken } from '../middleware/auth.middleware.js';
 import type { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import { broadcastNewTicket, broadcastTicketClaimed, broadcastNewMessage, broadcastTicketResolved } from '../socket.js';
+import { supabaseAdmin } from '../lib/supabaseClient.js';
 import {
   createTicket, claimTicket, resolveTicket,
   getWaitingTickets, getActiveTickets, getResolvedTickets,
-  sendTicketMessage, getTicketMessages
+  sendTicketMessage, getTicketMessages,
+  getTicketBySession, getTicketByEmail, sendUserMessage
 } from '../controllers/ticket.controller.js';
-import { supabaseAdmin } from '../lib/supabaseClient.js';
 
 const router = express.Router();
 
+async function resolveOrgId(widgetKey: string): Promise<string | null> {
+  const { data: org } = await supabaseAdmin.from('organizations').select('id').eq('widget_key', widgetKey).single();
+  return org?.id ?? null;
+}
+
+
 router.post('/escalate', async (req, res) => {
   try {
-    const { sessionId, question } = req.body;
-    if (!sessionId) return res.status(400).json({ error: 'Missing sessionId' });
-    const ticket = await createTicket(sessionId, question ?? '');
+    const { widgetKey, sessionId, question, email } = req.body;
+    if (!widgetKey || !sessionId) {
+      return res.status(400).json({ error: 'Missing widgetKey or sessionId' });
+    }
+
+    const orgId = await resolveOrgId(widgetKey);
+    if (!orgId) return res.status(404).json({ error: 'Invalid widget key' });
+
+    const ticket = await createTicket(orgId, sessionId, question ?? '', email);
     broadcastNewTicket(ticket);
     return res.status(201).json({ ticket });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to create ticket' });
+  }
+});
+
+router.get('/:id/public-messages', async (req, res) => {
+  try {
+    const { widgetKey } = req.query as { widgetKey?: string };
+    if (!widgetKey) return res.status(400).json({ error: 'Missing widgetKey' });
+
+    const orgId = await resolveOrgId(widgetKey);
+    if (!orgId) return res.status(404).json({ error: 'Invalid widget key' });
+
+    // confirm the ticket belongs to this org before returning anything
+    const { data: ticket } = await supabaseAdmin
+      .from('support_tickets')
+      .select('id')
+      .eq('id', req.params.id)
+      .eq('org_id', orgId)
+      .single();
+    if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+
+    const messages = await getTicketMessages(req.params.id); // already exists in your controller
+    return res.json({ messages });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch messages' });
+  }
+});
+
+router.post('/:id/user-message', async (req, res) => {
+  try {
+    const { widgetKey, content } = req.body;
+    if (!widgetKey || !content?.trim()) {
+      return res.status(400).json({ error: 'Missing widgetKey or content' });
+    }
+
+    const orgId = await resolveOrgId(widgetKey);
+    if (!orgId) return res.status(404).json({ error: 'Invalid widget key' });
+
+    const message = await sendUserMessage(orgId, req.params.id, content.trim());
+    broadcastNewMessage(req.params.id, message);
+    return res.status(201).json({ message });
+  } catch (err) {
+    return res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to send message' });
+  }
+});
+
+router.get('/status', async (req, res) => {
+  try {
+    const { widgetKey, sessionId } = req.query as { widgetKey?: string; sessionId?: string };
+    if (!widgetKey || !sessionId) return res.status(400).json({ error: 'Missing widgetKey or sessionId' });
+
+    const orgId = await resolveOrgId(widgetKey);
+    if (!orgId) return res.status(404).json({ error: 'Invalid widget key' });
+
+    const ticket = await getTicketBySession(orgId, sessionId);
+    return res.json({ ticket: ticket ?? null });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch ticket status' });
+  }
+});
+
+router.get('/lookup', async (req, res) => {
+  try {
+    const { widgetKey, email } = req.query as { widgetKey?: string; email?: string };
+    if (!widgetKey || !email) return res.status(400).json({ error: 'Missing widgetKey or email' });
+
+    const orgId = await resolveOrgId(widgetKey);
+    if (!orgId) return res.status(404).json({ error: 'Invalid widget key' });
+
+    const ticket = await getTicketByEmail(orgId, email);
+    return res.json({ ticket: ticket ?? null });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to lookup ticket' });
   }
 });
 

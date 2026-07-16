@@ -9,32 +9,38 @@ It combines:
 - a Python parser service to extract text from uploaded PDFs
 - a RAG (Retrieval-Augmented Generation) pipeline using embeddings and LLM chat completion
 - a multi-tenant organization model, where each admin account creates and owns an organization with its own widget key, widget configuration, and agents
+- an embeddable chat widget (separate React app, served in an iframe) that anonymous end-users interact with on a client's website, with session-based identity and optional email capture
+- a human-in-the-loop support ticket system, with a live WebSocket handoff between the widget and dedicated agent/admin dashboards
 
 ## Backend (`backend/`)
 
 ### Entry point
 - `backend/src/index.ts`
 - Sets up an Express server on port `4000`
-- Enables CORS for `http://localhost:5173`
+- Enables CORS for `http://localhost:5173` (admin/agent frontend) and for widget-facing routes (public, `origin: '*'`, since those are called from arbitrary customer websites)
+- Initializes Socket.IO on the same HTTP server (`initSocket(httpServer)`), **not** via `app.listen()` — sockets require the raw `http.Server` instance
 - Mounts API routers:
   - `/api/auth` for authentication
-  - `/api/chat` for chatbot queries
+  - `/api/chat` for chatbot queries (authenticated, logged-in dashboard chat) **and** widget chat (public, `widget_key`-scoped)
   - `/api/uploadFile` for PDF uploads and document management
   - `/api/settings` for organization settings, widget configuration, and widget key management
   - `/api/agents` for admin-managed agent accounts
+  - `/api/tickets` for escalation/support ticket creation, claiming, messaging, and resolution
+  - `/api/widget-config` for public widget theming/config lookup
+  - `/api/conversations` for public widget chat-history lookup
 
 ### Authentication
 - `backend/src/routes/authRouter.ts`
 - `backend/src/controllers/auth.controller.ts`
 - Uses Supabase auth via `backend/lib/supabaseClient.ts`
 - Supports:
-  - admin registration (`/api/auth/admin/register`) — creates a new organization and its first admin account (see **Organizations** below); this is now the only public signup path
-  - login (`/api/auth/login`) — returns the user's profile role and their organization membership (`org_id`, org name, `widget_key`, `plan`, org-level role)
+  - admin registration (`/api/auth/admin/register`) — creates a new organization and its first admin account (see **Organizations** below); this is the only public signup path
+  - login (`/api/auth/login`) — returns the user's profile role and their organization membership (`org_id`, org name, `widget_key`, `plan`, org-level role). Used by **both** admins and agents; the returned role determines post-login redirect (see **Frontend → Auth flow**)
   - token refresh (`/api/auth/refresh`)
   - current user info (`/api/auth/me`)
 - `backend/src/middleware/auth.middleware.ts` verifies JWTs using Supabase JWKS and attaches user info to requests.
 - `backend/src/middleware/role.middleware.ts` enforces admin-only and authenticated-user access.
-- Standalone user self-registration and the shared `ADMIN_REGISTRATION_SECRET` code have been removed. Admin accounts are created as part of organization creation, and all other org members (agents) are created by an existing admin rather than signing up themselves.
+- Standalone user self-registration and the shared `ADMIN_REGISTRATION_SECRET` code have been removed. Admin accounts are created as part of organization creation. **Agent accounts are created exclusively by an admin from the admin panel — agents do not have a public signup page.** An agent logs in with the email and password the admin set when creating their account, using the same `/api/auth/login` endpoint as admins; the response's org-scoped role (`admin` | `agent`) determines which dashboard they land on.
 
 ### Organizations and multi-tenancy
 - Tables: `organizations`, `organization_members`
@@ -52,18 +58,19 @@ It combines:
   2. Creates the Supabase auth user
   3. Sets `profiles.role` to `admin`
   4. Inserts an `organization_members` row linking the new user to the new org with `role: 'admin'`
-  4. If any step after org creation fails, the organization row is rolled back to avoid orphaned orgs
-- Every other org-scoped resource (widget config, agents, widget key) is looked up through the caller's `organization_members` row rather than a request parameter, so admins only ever act on their own organization.
+  5. If any step after org creation fails, the organization row is rolled back to avoid orphaned orgs
+- Every other org-scoped resource (widget config, agents, widget key, tickets, chunks, conversations) is looked up through the caller's `organization_members` row (for authenticated dashboard requests) or resolved server-side from the request's `widget_key` (for public widget requests) — never trusted from a client-supplied `org_id` parameter directly.
 
 ### Settings and widget configuration
 - `backend/src/routes/settingsRouter.ts` → mounted at `/api/settings`
 - `backend/src/controllers/settingsController.ts`
-- Table: `widget_configs` (one row per `org_id`) — `primary_color`, `bot_name`, `avatar_url`, `welcome_message`, `quick_questions` (jsonb array), `bubble_position`, `show_history_tab`, `escalation_enabled`, `updated_at`
+- Table: `widget_configs` (one row per `org_id`) — `primary_color`, `bot_name`, `avatar_url`, `welcome_message`, `quick_questions` (jsonb array), `bubble_position`, `show_history_tab`, `escalation_enabled`, `support_email`, `updated_at`
 - All endpoints require an authenticated admin (verified via the caller's `organization_members` row):
   - `GET /api/settings` — returns the caller's `organization` (including `widget_key`) and current `widget_configs` row (`null` if not yet configured)
   - `PUT /api/settings/widget-config` — upserts the `widget_configs` row for the caller's org (keyed on `org_id`)
   - `POST /api/settings/regenerate-key` — generates a new `wk_live_<uuid>` and overwrites `organizations.widget_key`; any previously installed script tag using the old key stops working immediately
 - The widget key is treated as a public, non-secret identifier (it ships in client-side HTML), not an access credential — access control for widget requests happens on the backend, not by hiding the key.
+- **Public widget endpoint:** `GET /api/widget-config?key=<widget_key>` — no auth required, resolves `org_id` from the key and returns the theming/config fields above. Falls back to sensible defaults if the org hasn't configured a `widget_configs` row yet, so a freshly signed-up org's embed still renders something usable.
 
 ### Agents
 - Agents are org members with `organization_members.role = 'agent'`, used for ticket handling.
@@ -72,14 +79,14 @@ It combines:
   2. Creates a Supabase auth user for the agent (`email`, `password`)
   3. Sets `profiles.role` to `agent`
   4. Inserts an `organization_members` row for the new user with `role: 'agent'` under the admin's org
-- Agents cannot self-register; accounts are created exclusively by an admin from the admin panel.
+- **Agents cannot self-register.** Accounts are created exclusively by an admin from the admin panel, who sets the agent's initial email and password. The agent then logs in at the same `/login` page as admins using those credentials; on successful login, the org-scoped `role` returned by `/api/auth/login` routes them to the agent-only dashboard rather than the admin panel.
 
 ### File upload and ingestion
 - `backend/src/routes/uploadFile.ts`
 - `backend/src/controllers/uploadController.ts`
 - Admin-only upload endpoint accepts PDF files via multer memory storage.
 - Uploaded PDFs are forwarded to the parser service at `http://localhost:8000/parse`.
-- Parsed output is chunked, embedded, and stored in Supabase by:
+- Parsed output is chunked, embedded, and stored in Supabase (scoped by `org_id`) by:
   - `backend/src/controllers/chunkService.ts`
   - `backend/src/controllers/embeddingService.ts`
   - `backend/src/controllers/embeddingToDb.ts`
@@ -87,27 +94,58 @@ It combines:
 
 ### Chat and RAG pipeline
 - `backend/src/routes/chatRoutes.ts`
-- `backend/src/controllers/chatbotController.ts`
+- `backend/src/controllers/chatbotController.ts` — handles **both** the authenticated dashboard chat and the public widget chat, routing internally between RAG, casual-query shortcuts, and open-ticket handoff (see **Escalation and support tickets** below)
 - `backend/src/controllers/ragService.ts`
-- Chat endpoints (all require authentication via JWT):
+- Dashboard chat endpoints (authenticated via JWT):
   - `GET /api/chat/sessions` — loads the current user's chat sessions and message history
-  - `POST /api/chat` — sends a message and returns `{ reply, sessionId }`
   - `DELETE /api/chat/:sessionId` — deletes the session conversation history and removes the `user_session` link for the authenticated user
   - `GET /api/chat/analytics` — query analytics for admins
-- Session ownership is managed by the backend in the `user_session` table (`user_id`, `session_id`).
-  - On `POST /api/chat`, if `sessionId` is missing or `"new"`, the backend generates a UUID and creates a `user_session` row for the authenticated user.
-  - If a `sessionId` is provided but not yet linked, the backend creates the `user_session` row before processing the message.
-- Message history is stored in the `conversations` table (`session_id`, `role`, `content`, `created_at`) via the service-role Supabase client.
-- RAG chat flow (`POST /api/chat`):
-  1. User sends `sessionId` (optional) and `message` to `/api/chat`
-  2. Backend ensures the session is linked to the user in `user_session`
-  3. Backend embeds the user query using Google GenAI (`gemini-embedding-001`)
-  4. Supabase vector search RPC `match_chunks` retrieves top matching document chunks
-  5. Conversation history for the session is loaded from `conversations`
-  6. A system prompt is built with retrieved context and sent to Groq LLM chat completion
-  7. Answer is returned and both question and response are saved to `conversations`
-  8. Response includes `{ reply, sessionId }` so the frontend can adopt the server-assigned session id
-- If no relevant chunks are found, the bot returns a fallback answer: `I don't have that information, please contact our sales team.`
+- Widget chat endpoint (public, `widget_key`-scoped):
+  - `POST /api/chat` — accepts `{ widget_key, session_id, message }`. Resolves `org_id` from `widget_key`, then branches:
+    1. **If the session has an open ticket** (`status` = `waiting` or `in_progress`) — the message is saved to `ticket_messages` and broadcast to the agent via WebSocket; the RAG pipeline is skipped entirely.
+    2. **Else if it matches a casual-query pattern** (greetings, thanks, etc.) — a canned reply is returned without invoking retrieval or the LLM.
+    3. **Else** — the full RAG flow runs (embed → hybrid retrieve → rerank → generate), scoped to the resolved `org_id`.
+  - Returns `{ reply, sessionId, mode: 'ticket' | 'bot', ticketId?, escalated? }`
+- RAG chat flow, org-scoped:
+  1. Backend embeds the user query using Google GenAI (`gemini-embedding-001`)
+  2. Supabase vector search RPC `match_chunks` (now takes a `p_org_id` parameter) retrieves top matching document chunks **for that org only**, combined with keyword full-text search via Reciprocal Rank Fusion
+  3. Chunks are reranked using a lightweight LLM relevance scoring pass
+  4. Conversation history for the session is loaded from `conversations`, scoped by `org_id` + `session_id`
+  5. A system prompt is built with retrieved context (referencing the org's configured `support_email` for the "I don't have that detail" fallback line) and sent to Groq LLM chat completion
+  6. Answer is returned and both question and response are saved to `conversations`
+  7. Query metrics are logged to `query_logs` (`org_id`, latency, chunks retrieved, top score)
+- If no relevant chunks are found, the bot returns a fallback answer directing the user to contact support, and this event is treated as a signal that escalation (via the "Talk to a human" flow) may be appropriate — though escalation itself remains **user-initiated**, not automatically triggered (see below).
+
+### Escalation and support tickets
+Escalation in this system is **explicitly triggered by the end-user clicking "Talk to a human" in the widget** — there is no AI-based escalation-intent detection model. This keeps escalation latency-free (no extra LLM call in the chat path) and gives the user direct control over when to leave the bot.
+
+- Tables: `support_tickets`, `ticket_messages`
+- `support_tickets`
+  - `id`, `org_id`, `session_id`, `user_question`, `status` (`waiting` | `in_progress` | `resolved`), `assigned_agent_id`, `email` (nullable, Tier 2 capture), `created_at`, `updated_at`
+- `ticket_messages`
+  - `id`, `ticket_id`, `org_id`, `sender_id` (nullable — null for anonymous widget users), `sender_role` (`user` | `agent`), `content`, `created_at`
+- `backend/src/routes/ticketRouter.ts` and `backend/src/controllers/ticket.controller.ts`:
+  - `POST /api/tickets/escalate` — public. Body: `{ widgetKey, sessionId, question, email? }`. Resolves `org_id`, creates a `support_tickets` row with `status: 'waiting'`, broadcasts `ticket:new` to the `staff_room` (so it appears live in agents' Inbox).
+  - `POST /api/tickets/:id/user-message` — public. Body: `{ widgetKey, content }`. Confirms the ticket belongs to the resolved org, saves a `ticket_messages` row with `sender_role: 'user'`, broadcasts `message:new` to the ticket's room.
+  - `GET /api/tickets/status?widgetKey=&sessionId=` — public. Returns the most recent ticket (if any) for that session, so the widget can restore ticket state after a page reload rather than relying solely on `localStorage`.
+  - `GET /api/tickets/lookup?widgetKey=&email=` — public. Tier 2 recovery: finds the most recent ticket by email, for cases where the session's `localStorage` (and thus `session_id`) has been lost.
+  - `GET /api/tickets/:id/public-messages?widgetKey=` — public. Returns the ticket's message history so the widget can restore an in-progress or resolved conversation on reload, in addition to the bot conversation history from `/api/conversations`.
+  - `GET /api/tickets/inbox` (admin/agent, authenticated) — tickets with `status: 'waiting'`, visible to all agents in the org.
+  - `GET /api/tickets/active` (admin/agent, authenticated) — tickets with `status: 'in_progress'`; agents see only their own claimed tickets, admins see all.
+  - `GET /api/tickets/resolved` (admin/agent, authenticated) — same scoping as above, `status: 'resolved'`.
+  - `POST /api/tickets/:id/claim` (admin/agent, authenticated) — atomically claims a ticket via a conditional `UPDATE ... WHERE id = ? AND status = 'waiting'`, which prevents two agents from claiming the same ticket concurrently (the losing request's `WHERE` clause simply matches zero rows and the endpoint returns an error). Broadcasts `ticket:claimed`.
+  - `GET /api/tickets/:id/messages` (admin/agent, authenticated) — full message history for the agent's chat panel.
+  - `POST /api/tickets/:id/messages` (admin/agent, authenticated) — agent sends a reply; saved with `sender_role: 'agent'`, broadcasts `message:new`.
+  - `POST /api/tickets/:id/resolve` (admin/agent, authenticated) — sets `status: 'resolved'`, broadcasts `ticket:resolved` to both the ticket's room and `staff_room`.
+  - `GET /api/tickets/:id/context` (admin/agent, authenticated) — fetches the pre-escalation bot conversation history (`conversations` table, by `session_id`) so the claiming agent sees the full picture, not just messages sent after escalation.
+
+### WebSocket layer
+- `backend/src/socket.ts`
+- Socket.IO server initialized on the shared HTTP server.
+- Rooms:
+  - `staff_room` — all connected agents/admins join this on login (`register_staff`); used for org-wide ticket list updates (`ticket:new`, `ticket:claimed`, `ticket:resolved`)
+  - `ticket_<id>` — joined by both the widget (once a ticket exists for that session) and the claiming agent; used for the live back-and-forth (`message:new`)
+- Broadcast helpers: `broadcastNewTicket`, `broadcastTicketClaimed`, `broadcastNewMessage`, `broadcastTicketResolved`, `broadcastCollaboratorAdded`
 
 ### External services and environment
 - Uses Supabase with both anonymous and service-role clients
@@ -135,39 +173,40 @@ It combines:
   - `filename`
   - `pages`: list of `{ page, markdown }`
 
-## Frontend (`frontend/`)
+## Admin / Agent frontend (`frontend/`)
 
 ### Application structure
 - React + TypeScript + Vite
 - Routes in `frontend/src/App.tsx`:
   - `/` landing page
-  - `/login` login page
-  - `/signup` admin/organization signup page
-  - `/chat` and `/chats` protected chat interface
+  - `/login` shared login page for **both** admins and agents
+  - `/signup` admin/organization signup page (org creation only — agents cannot reach this page)
+  - `/chat` and `/chats` protected chat interface (logged-in dashboard chat, separate from the public widget)
   - `/admin` protected admin document management page (Knowledge base)
   - `/settings` protected admin settings page (widget install snippet, widget configuration, key regeneration)
-  - `/dashboard` protected tickets page
+  - `/dashboard` protected **admin** tickets page (`AgentDashboard.tsx` — includes org-wide stats and Knowledge base/Analytics nav; effectively the admin's view into the ticket queue)
+  - `/agent` protected **agent-only** tickets page (`AgentOnlyDashboard.tsx` — same inbox/active/resolved ticket flow, with admin-only nav links and org-wide stat cards removed)
   - `/analytics` protected analytics page
 - Uses `frontend/src/context/AuthContext.tsx` for auth state and token persistence
 - Uses `frontend/src/api/client.ts` (`apiFetch`) to manage auth headers, token refresh-and-retry on `401`, and JSON parsing for all API requests
 
 ### Auth flow
-- `frontend/src/pages/LoginPage.tsx` logs users in and stores auth tokens in local storage
-- `frontend/src/pages/SignupPage.tsx` creates a new organization and its admin account in one step — fields are organization name, email, and password. Self-service user signup and the admin-secret-code field have been removed.
+- `frontend/src/pages/LoginPage.tsx` logs users in and stores auth tokens in local storage. After login, the returned org-scoped `role` determines the redirect: `admin` → `/dashboard` (or `/admin`), `agent` → `/agent`.
+- `frontend/src/pages/SignupPage.tsx` creates a new organization and its admin account in one step — fields are organization name, email, and password. Self-service user signup and the admin-secret-code field have been removed. **There is no agent-facing signup page** — agent accounts only ever come from an admin creating them via the admin panel, and the agent's first login uses those admin-issued credentials.
 - `frontend/src/api/auth.ts` wraps API calls to `/api/auth`
 - `frontend/src/context/AuthContext.tsx` restores sessions and refreshes current user info
 
-### Chat UI
+### Ticket dashboards
+- `frontend/src/components/AgentDashboard.tsx` — used at `/dashboard` for admins. Shows Inbox/Active/Resolved tabs, KPI cards (Waiting, Total Agents, Resolved, plus a placeholder count), and admin-only nav buttons (Knowledge base, Analytics). Claiming a ticket opens `TicketChatPanel`.
+- `frontend/src/components/AgentOnlyDashboard.tsx` — used at `/agent` for agents. Same tab/list/claim structure and the same `TicketChatPanel`, but with the admin-only nav buttons and the "Total Agents" KPI card removed (3-card KPI row: Waiting, My Active, Resolved), and a visible banner if a claim attempt loses the race to another agent (see **Concurrent ticket claiming** below).
+- `frontend/src/components/TicketChatPanel.tsx` — shared by both dashboards. Merges pre-escalation `conversations` history with `ticket_messages`, sorted by timestamp; live-updates via `message:new`; message bubbles wrap long text (`whitespace-pre-wrap` / `break-words`) instead of overflowing.
+- **Concurrent ticket claiming:** claim safety is enforced at the database layer, not in application code — `claimTicket` issues a single conditional `UPDATE support_tickets SET status='in_progress', assigned_agent_id=? WHERE id=? AND status='waiting'`. If two agents click "Claim" on the same ticket simultaneously, only one `UPDATE` matches the `WHERE` clause; the other returns no row, and the frontend shows an inline "This ticket was just claimed by another agent" message and refreshes the inbox so the stale ticket disappears immediately.
+
+### Chat UI (dashboard)
 - `frontend/src/pages/ChatPage.tsx` renders the chat interface
 - `frontend/src/hooks/useChat.ts` manages session state, message history, and chat sending
-- `frontend/src/api/chat.ts` wraps chat API calls:
-  - `fetchChatSessions()` — `GET /api/chat/sessions` to load the sidebar and conversation history
-  - `postChat(sessionId, message)` — `POST /api/chat`, returns `{ reply, sessionId }`
-- Chat data is loaded and persisted through the backend API only (not via direct Supabase reads from the frontend).
-- On login, sessions are fetched from the backend and shown in the sidebar (newest first).
-- Sending the first message auto-creates a local session; the backend links it to the user in `user_session` and saves messages to `conversations`.
-- **New chat** creates an empty local session; the backend creates the `user_session` row when the first message is sent.
-- Local state includes multiple sessions, message lists, and loading states
+- `frontend/src/api/chat.ts` wraps chat API calls
+- Chat data is loaded and persisted through the backend API only (not via direct Supabase reads from the frontend)
 
 ### Admin UI
 - `frontend/src/pages/AdminPage.tsx` — Knowledge base page for uploading and listing PDF documents
@@ -176,32 +215,53 @@ It combines:
 
 ### Settings UI
 - `frontend/src/pages/SettingsPage.tsx` — admin-only page with two sections:
-  - **Install widget** — displays the `<script>` embed tag built from the org's `widget_key`, with copy-to-clipboard and a "Regenerate key" action (confirmation required, since it invalidates the previous script tag)
-  - **Widget configuration** — form for `bot_name`, `primary_color`, `avatar_url`, `welcome_message`, `quick_questions` (add/remove list), `bubble_position`, `show_history_tab`, `escalation_enabled`, saved via a single "Save configuration" action
-- `frontend/src/api/settings.ts` wraps API calls to `/api/settings`:
-  - `getSettings()` — `GET /api/settings`, returns `{ organization, widgetConfig }`
-  - `updateWidgetConfig(config)` — `PUT /api/settings/widget-config`
-  - `regenerateWidgetKey()` — `POST /api/settings/regenerate-key`
-- Styling matches `AdminPage.tsx` (same header/footer shell, `border-border` / `bg-surface` / `text-text-*` / `bg-accent` tokens, `font-ui` typography) so Settings feels like a native part of the admin panel rather than a bolted-on page.
+  - **Install widget** — displays the `<script>` embed tag built from the org's `widget_key`, with copy-to-clipboard and a "Regenerate key" action
+  - **Widget configuration** — form for `bot_name`, `primary_color`, `avatar_url`, `welcome_message`, `quick_questions`, `bubble_position`, `show_history_tab`, `escalation_enabled`, saved via a single "Save configuration" action
+- `frontend/src/api/settings.ts` wraps API calls to `/api/settings`
+
+## Widget app (`widget-app/`)
+
+A separate, standalone React + Vite app, deployed independently and rendered inside an iframe on a customer's website. This is what an anonymous end-user actually interacts with — it is not part of the admin/agent frontend above.
+
+### Embedding
+- `widget.js` — a small vanilla-JS loader, served at `/widget.js`, that a customer pastes as `<script src=".../widget.js" data-org="wk_live_...">`. It reads the `data-org` widget key, fetches `/api/widget-config`, and injects a floating bubble that opens an iframe pointing at the deployed widget app (`.../widget-app/?org=wk_live_...`) on click.
+
+### Identity (Tier 1 + Tier 2)
+- **Tier 1 (anonymous session):** on first load, `App.tsx` reads `?org=` from the URL and generates/reuses a `session_id` UUID stored in `localStorage` under `ybot_session_<org_key>`. Every widget API call includes `widget_key` + `session_id`.
+- **Tier 2 (optional email):** captured contextually, specifically when the user clicks "Talk to a human" — not required to use the bot. Stored in `localStorage` under `ybot_email_<org_key>` for reuse on future escalations, and saved on the `support_tickets.email` column for server-side recovery (`GET /api/tickets/lookup`) if the session's `localStorage` is later lost.
+
+### Components
+- `App.tsx` — resolves `org` and `session_id`, fetches widget config, renders `Header` + `ChatPanel`. Unchanged by the ticket work.
+- `Header.tsx` — branding (bot name, avatar, color) and a close button that `postMessage`s the parent page to hide the iframe. Unchanged by the ticket work.
+- `ChatPanel.tsx` — the core chat UI. Responsibilities:
+  - Loads bot conversation history (`/api/conversations`) and, if an open or past ticket exists for the session, also loads and merges ticket message history (`/api/tickets/:id/public-messages`) and restores `ticketId`/`ticketStatus` from the server (`/api/tickets/status`) rather than trusting `localStorage` alone — this avoids showing stale state if a ticket was claimed/resolved while the widget was closed.
+  - Renders quick-question buttons (from widget config) before the first message.
+  - `sendMessage`: if a ticket is `waiting` or `in_progress`, the message is sent to `/api/tickets/:id/user-message` and the function returns immediately — it does **not** also call `/api/chat`. Otherwise, the message goes through the normal bot path via `/api/chat`.
+  - Renders a "Talk to a human" button once the first message has been sent (hidden once a ticket exists); clicking it shows an email-capture prompt (skippable) before creating the ticket via `/api/tickets/escalate`.
+  - Subscribes to the ticket's WebSocket room once `ticketId` is set (`join_ticket`), listening for `ticket:claimed` ("An agent has joined" system message), `message:new` (agent replies, filtered to skip echoes of the user's own messages), and `ticket:resolved` (disables the input and shows a closing message).
+  - Message bubbles wrap long text (`whiteSpace: pre-wrap`, `wordBreak/overflowWrap: break-word`) instead of overflowing the bubble.
+- `src/lib/socket.ts` (widget app, client-side) — a `getSocket()` singleton wrapping `socket.io-client`, pointed at the backend's base URL via `VITE_API_BASE_URL`.
 
 ## Overall workflow
 
 1. An admin signs up, creating both an organization (with a generated `widget_key`) and their own admin account in one step.
 2. The admin uploads a PDF from the Knowledge base page; the backend forwards it to the parser service, which converts it to markdown pages.
-3. The backend chunks the markdown, embeds it, and stores it in Supabase.
-4. The admin visits Settings to copy the install script tag (containing their `widget_key`) onto their site, and optionally customizes widget behavior (bot name, colors, welcome message, quick questions, etc.) via widget configuration.
-5. The admin can create agent accounts from the admin panel; agents are added to the organization with an `agent` role for handling tickets.
-6. A logged-in user opens the chat page; the frontend loads their sessions via `GET /api/chat/sessions`.
-7. The user sends a chat message; the backend creates or verifies the session in `user_session`, then runs the RAG pipeline.
-8. The backend retrieves relevant chunks and conversation history from Supabase.
-9. The backend calls an LLM to generate an answer grounded in the uploaded documents.
-10. The answer and messages are saved to `conversations`; `{ reply, sessionId }` is returned to the frontend.
-11. The frontend updates the conversation window and sidebar; on refresh, history reloads from the backend.
+3. The backend chunks the markdown, embeds it, and stores it in Supabase, scoped to the org.
+4. The admin visits Settings to copy the install script tag (containing their `widget_key`) onto their site, and optionally customizes widget behavior (bot name, colors, welcome message, quick questions, support email, etc.) via widget configuration.
+5. The admin creates agent accounts from the admin panel (email + password chosen by the admin); agents are added to the organization with an `agent` role for handling tickets. **Agents log in at the same `/login` page using the credentials the admin created for them** — there is no separate agent signup flow.
+6. A visitor on the customer's website opens the embedded widget; a `session_id` is generated and stored locally, and the widget loads any existing bot/ticket history for that session.
+7. The visitor asks questions; each message is answered by the RAG pipeline, scoped to the organization's own documents, unless a support ticket is already open for that session (in which case messages route to the live agent conversation instead).
+8. If the bot can't help, the visitor can click "Talk to a human," optionally providing an email, which creates a `support_tickets` row and notifies all connected agents/admins live via WebSocket.
+9. An agent or admin claims the ticket from their dashboard (claim is atomic at the DB level, preventing double-claims); the ticket moves to their Active tab, and they see the full pre-escalation bot conversation plus the live ticket thread.
+10. The agent and the widget user exchange messages in real time over the `ticket_<id>` WebSocket room.
+11. The agent marks the ticket resolved, which notifies the widget (disabling further input there) and removes the ticket from the active list on the dashboard.
+12. Separately, a logged-in dashboard user (not the anonymous widget flow) can use `/chat` for authenticated, session-based RAG chat, unrelated to the widget/ticket system.
 
 ## Notes
 
-- The project is designed for local development with `frontend` on `localhost:5173`, `backend` on `localhost:4000`, and parser service on `localhost:8000`.
-- The frontend uses protected routes and token-based auth to secure chat and admin pages.
-- The backend enforces admin-only access for uploading and listing files, managing settings/widget configuration, regenerating the widget key, and creating agent accounts.
-- Every admin-scoped backend endpoint resolves the organization from the authenticated caller's `organization_members` row rather than trusting a client-supplied org id, so admins can only ever read or modify their own organization's data.
-- The core value is a document-powered chatbot that can answer questions from uploaded PDF knowledge bases, deployed per-organization via an embeddable widget.
+- The project is designed for local development with the admin/agent `frontend` on `localhost:5173`, the widget app on its own Vite port, `backend` on `localhost:4000`, and parser service on `localhost:8000`.
+- The admin/agent frontend uses protected routes and token-based auth to secure chat, admin, and ticket-dashboard pages. The widget app uses no login at all — identity is session/email based, per the Tier 1 + Tier 2 model above.
+- The backend enforces admin-only access for uploading and listing files, managing settings/widget configuration, regenerating the widget key, and creating agent accounts. Agent accounts, once created by an admin, have their own authenticated access to the ticket dashboards and endpoints, scoped to their org.
+- Every admin/agent-scoped backend endpoint resolves the organization from the authenticated caller's `organization_members` row rather than trusting a client-supplied org id; every widget-facing endpoint resolves the organization from the request's `widget_key` rather than trusting a client-supplied org id. Neither ever trusts an `org_id` sent directly by the client.
+- Escalation to a human agent is user-initiated only (a "Talk to a human" action in the widget) — there is no automated escalation-intent detection model in the chat pipeline, keeping the RAG response path free of extra latency.
+- The core value is a document-powered chatbot that can answer questions from uploaded PDF knowledge bases, deployed per-organization via an embeddable widget, with a live human-agent fallback when the bot can't help.
