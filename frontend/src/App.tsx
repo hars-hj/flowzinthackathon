@@ -9,6 +9,7 @@ import { AnalyticsPage } from './pages/AnalyticsPage'
 import { AgentDashboard } from './pages/AgentDashBoard'
 import { SettingsPage } from './pages/settingsPage'
 import {AgentOnlyDashboard} from './pages/AgentsPage'
+import{ AgentsPage } from './pages/createAgent'
 
 function App() {
   return (
@@ -69,6 +70,16 @@ function App() {
         element={
           <ProtectedRoute staffOnly>
             <AgentOnlyDashboard />
+          </ProtectedRoute>
+        }
+       
+      />
+
+      <Route
+        path="/manageAgents"
+        element={
+          <ProtectedRoute adminOnly>
+            <AgentsPage />
           </ProtectedRoute>
         }
        

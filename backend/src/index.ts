@@ -14,6 +14,8 @@ import widgetConfigRouter from './routes/widgetRouter.js';
 import conversationRoutes from './routes/conversations.js';
 import settingRouter from './routes/setting.js';
 import path from 'path/win32';
+import manageAgentsRouter from './routes/manageAgents.js';
+
 const app = express();
 const port = process.env.PORT || 4000;
 
@@ -42,7 +44,7 @@ app.use('/api/widget-config', widgetConfigRouter);
 app.use(express.static(path.join(__dirname, "../public")));+
 app.use('/api/conversations',conversationRoutes);
 app.use('/api/settings', settingRouter);
-
+app.use('/api/manageAgents', manageAgentsRouter);
 
 app.get('/', (req: Request, res: Response) => {
   res.send({ status: 'backend running', message: 'Chatbot API is available at /api/chat' });

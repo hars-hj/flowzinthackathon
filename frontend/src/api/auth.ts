@@ -6,7 +6,7 @@ import {
   type StoredAuth,
 } from './client'
 
-export type UserRole = 'user' | 'admin'
+export type UserRole = 'user' | 'admin' | 'agent'
 
 export interface AuthUser {
   id: string
@@ -56,6 +56,20 @@ export async function registerAdmin(
     method: 'POST',
     body: JSON.stringify({ email, password, organizationName }),
   })
+}
+
+export async function createAgent(payload: { email: string; password: string }) {
+  const res = await fetch('/api/agents', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.message ?? 'Failed to create agent')
+  }
+  return res.json()
 }
 
 export async function fetchMe(): Promise<AuthUser> {

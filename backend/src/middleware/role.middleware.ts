@@ -12,6 +12,18 @@ export function requireAdmin(
   next();
 }
 
+export function requireAgent(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) {
+  if (!req.user || req.user.role !== 'agent') {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  next();
+}
+
 // export function requireUser(
 //   req: AuthenticatedRequest,
 //   res: Response,

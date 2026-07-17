@@ -40,6 +40,7 @@ export async function getSettings(): Promise<SettingsResponse> {
   })
 }
 
+
 export async function updateWidgetConfig(
   config: Partial<Omit<WidgetConfig, 'org_id' | 'updated_at'>>,
 ): Promise<WidgetConfig> {

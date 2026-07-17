@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import {  registerAdmin, login, refreshToken, getMe } from '../controllers/auth.controller.js';
 import { authenticateToken } from '../middleware/auth.middleware.js';
-import { createAgent } from '../controllers/createAgent.js';
+import { createAgent } from '../controllers/manageAgents.js';
 import { requireAdmin } from '../middleware/role.middleware.js';
 const router = Router();
 

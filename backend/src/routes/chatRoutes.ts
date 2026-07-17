@@ -1,6 +1,6 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth.middleware.js';
-import { requireUser } from '../middleware/role.middleware.js';
+//import { requireUser } from '../middleware/role.middleware.js';
 //import { chatHandler, getSessionsHandler, deleteSessionHandler } from '../controllers/chatbotController.js';
 import { embedQuery, retrieveChunks ,chat} from '../controllers/ragService.js';
 import { supabaseAdmin } from '../lib/supabaseClient.js';

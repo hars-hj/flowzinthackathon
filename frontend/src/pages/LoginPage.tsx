@@ -25,7 +25,13 @@ export function LoginPage() {
     try {
       const user = await loginUser(email, password)
       setUser(user)
-      navigate(user.role === 'admin' ? '/admin' : '/chats', { replace: true })
+      if (user.role === 'admin') {
+        navigate('/admin', { replace: true });
+      } else if (user.role === 'agent') {
+        navigate('/agent');
+      } else {
+        navigate('/chats', { replace: true });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
     } finally {

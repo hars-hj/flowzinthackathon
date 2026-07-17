@@ -8,11 +8,11 @@ const JWKS = createRemoteJWKSet(
 );
 
 export interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    role: 'user' | 'admin';
-  };
+    user?: {
+      id: string;
+      email: string;
+      role: 'user' | 'admin' | 'agent';
+    };
 }
 
 export async function authenticateToken(
@@ -42,6 +42,7 @@ export async function authenticateToken(
       .single();
 
     if (error || !profile) {
+     // console.log("Failed to fetch user profile for userId, in auth controller:", userId, "Error:", error);
       return res.status(401).json({ error: 'User profile not found' });
     }
 
@@ -49,7 +50,7 @@ export async function authenticateToken(
     req.user = {
       id: userId,
       email,
-      role: profile.role as 'user' | 'admin',
+      role: profile.role as 'user' | 'admin' | 'agent',
     };
 
     next();

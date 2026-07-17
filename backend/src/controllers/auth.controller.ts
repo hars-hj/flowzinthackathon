@@ -116,7 +116,7 @@ export async function login(req: Request, res: Response) {
     user: {
       id: data.user.id,
       email: data.user.email ?? '',
-      role: (profile.role as 'user' | 'admin') ?? 'user',
+      role:  (profile.role as 'user' | 'admin' | 'agent') ?? 'user',
     },
   });
 }
