@@ -25,18 +25,36 @@ export interface MeResponse {
 }
 
 export async function loginUser(email: string, password: string): Promise<AuthUser> {
-  const data = await apiFetch<LoginResponse>('/api/auth/login', {
-    method: 'POST',
-    body: JSON.stringify({ email, password }),
-  })
+  let data: LoginResponse
 
-  setStoredAuth({
-    accessToken: data.accessToken,
-    refreshToken: data.refreshToken,
-    user: data.user,
-  })
+  try {
+    data = await apiFetch<LoginResponse>('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    })
+  } catch (error) {
+    // If apiFetch throws a structured error (e.g. { message, status }), surface it
+    if (error instanceof Error) {
+      throw new Error(error.message || 'Login failed. Please check your credentials.')
+    }
+    throw new Error('Login failed. Please check your credentials.')
+  }
 
-  return fetchMe()
+  try {
+    setStoredAuth({
+      accessToken: data.accessToken,
+      refreshToken: data.refreshToken,
+      user: data.user,
+    })
+  } catch (error) {
+    throw new Error('Login succeeded but failed to store session. Please try again.')
+  }
+
+  try {
+    return await fetchMe()
+  } catch (error) {
+    throw new Error('Login succeeded but failed to fetch user profile.')
+  }
 }
 
 // export async function registerUser(email: string, password: string): Promise<void> {

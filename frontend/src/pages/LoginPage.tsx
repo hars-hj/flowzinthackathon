@@ -25,6 +25,7 @@ export function LoginPage() {
     try {
       const user = await loginUser(email, password)
       setUser(user)
+     
       if (user.role === 'admin') {
         navigate('/admin', { replace: true });
       } else if (user.role === 'agent') {

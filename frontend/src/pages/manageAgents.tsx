@@ -140,7 +140,7 @@ export function AgentsPage() {
           </button>
           <button
             type="button"
-            onClick={() => navigate('/agents')}
+            onClick={() => navigate('/manageAgents')}
             className="rounded-lg border border-accent bg-accent-light px-3 py-1.5 font-ui text-xs font-medium text-accent"
           >
             Manage Agents

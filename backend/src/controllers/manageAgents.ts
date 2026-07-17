@@ -43,12 +43,18 @@ export async function createAgent(req: AuthenticatedRequest, res: Response) {
   }
 
   const userId = data.user.id;
+  console.log("Created new agent user with ID:", userId);
 
   // 2. Set role to agent in profiles table
   const { error: profileError } = await supabaseAdmin
     .from('profiles')
-    .update({ role: 'agent' })
+    .update({
+      role: 'agent',
+      email,
+    })
     .eq('id', userId);
+
+    
 
   if (profileError) {
     await supabaseAdmin.auth.admin.deleteUser(userId);
@@ -56,14 +62,14 @@ export async function createAgent(req: AuthenticatedRequest, res: Response) {
   }
 
   // 3. Add user as an agent member of the admin's organization
-  const { error: memberError } = await supabaseAdmin
+  const { data: memberData,error: memberError } = await supabaseAdmin
     .from('organization_members')
     .insert({
       org_id: orgId,
       user_id: userId,
       role: 'agent',
     });
-
+ console.log("Inserted new agent into organization_members:", memberData);
   if (memberError) {
     await supabaseAdmin.auth.admin.deleteUser(userId);
     return res.status(500).json({ error: 'Failed to create organization membership' });
@@ -87,7 +93,7 @@ export async function getAgents(req: AuthenticatedRequest, res: Response) {
   if (!orgId) {
     return res.status(403).json({ error: 'No organization found for this admin' });
   }
-
+ console.log("Fetching agents for organization ID:", orgId);
   const { data, error } = await supabaseAdmin
     .from('organization_members')
     .select(`
@@ -95,18 +101,34 @@ export async function getAgents(req: AuthenticatedRequest, res: Response) {
       created_at
     `)
     .eq('org_id', orgId)
-    .eq('role', 'agent');
+    
 
   if (error) {
     console.error("Error fetching agents:", error);
     return res.status(500).json({ error: 'Failed to load agents' });
   }
 
-  const agents = (data ?? []).map((row: any) => ({
-    id: row.user_id,
-    email: req.user?.email ?? '',
-    created_at: row.created_at,
-  }));
+const agents = await Promise.all(
+  (data ?? []).map(async (row: any) => {
+    const { data: profile, error } = await supabaseAdmin
+      .from('profiles')
+      .select('email')
+      .eq('id', row.user_id)
+      .single();
+
+    if (error) {
+      console.error(`Failed to fetch profile for ${row.user_id}:`, error);
+    }
+
+    return {
+      id: row.user_id,
+      email: profile?.email ?? '',
+      created_at: row.created_at,
+    };
+  })
+);
+
+
 
   return res.status(200).json(agents);
 }

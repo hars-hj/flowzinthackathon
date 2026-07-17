@@ -58,7 +58,10 @@ export async function registerAdmin(req: Request, res: Response) {
   // 3. Set role to admin in profiles table
   const { error: profileError } = await supabaseAdmin
     .from('profiles')
-    .update({ role: 'admin' })
+    .update({
+    role: 'admin',
+    email,
+    })
     .eq('id', data.user.id);
 
   if (profileError) {

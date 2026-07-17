@@ -66,9 +66,9 @@ function App() {
         }
       />
       <Route
-        path="/settings"
+        path="/agent"
         element={
-          <ProtectedRoute staffOnly>
+           <ProtectedRoute staffOnly>
             <AgentOnlyDashboard />
           </ProtectedRoute>
         }
