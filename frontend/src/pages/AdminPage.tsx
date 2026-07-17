@@ -91,6 +91,13 @@ export function AdminPage() {
           </button>
           <button
             type="button"
+            onClick={() => navigate('/manageAgents')}
+            className="rounded-lg border border-border px-3 py-1.5 font-ui text-xs text-text-secondary transition-all duration-150 hover:bg-accent-light hover:text-accent"
+          >
+            Manage Agents
+          </button>
+          <button
+            type="button"
             onClick={handleLogout}
             className="flex h-9 w-9 items-center justify-center rounded-lg text-text-hint transition-all duration-150 hover:bg-surface-muted hover:text-text-secondary"
             aria-label="Log out"

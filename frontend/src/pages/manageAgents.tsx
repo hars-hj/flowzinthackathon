@@ -130,19 +130,20 @@ export function AgentsPage() {
           >
             Tickets
           </button>
-          <button
-            type="button"
-            onClick={() => navigate('/agents')}
-            className="rounded-lg border border-accent bg-accent-light px-3 py-1.5 font-ui text-xs font-medium text-accent"
-          >
-            Agents
-          </button>
+          
           <button
             type="button"
             onClick={() => navigate('/settings')}
             className="rounded-lg border border-border px-3 py-1.5 font-ui text-xs text-text-secondary transition-all duration-150 hover:bg-accent-light hover:text-accent"
           >
             Settings
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/agents')}
+            className="rounded-lg border border-accent bg-accent-light px-3 py-1.5 font-ui text-xs font-medium text-accent"
+          >
+            Manage Agents
           </button>
           <button
             type="button"

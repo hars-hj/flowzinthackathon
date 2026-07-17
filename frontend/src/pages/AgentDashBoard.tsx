@@ -123,17 +123,36 @@ export function AgentDashboard() {
     {role === 'admin' && (
       <>
         <button
-          onClick={() => navigate('/admin')}
-          className="rounded-lg bg-white/15 px-3 py-1.5 font-ui text-xs text-white transition-all hover:bg-white/25"
-        >
-          Knowledge base
-        </button>
-        <button
           onClick={() => navigate('/analytics')}
           className="rounded-lg bg-white/15 px-3 py-1.5 font-ui text-xs text-white transition-all hover:bg-white/25"
-        >
-          Analytics
-        </button>
+          >
+            Analytics
+          </button>
+
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="rounded-lg bg-white/15 px-3 py-1.5 font-ui text-xs text-white transition-all hover:bg-white/25"
+          >
+            Tickets
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/settings')}
+            className="rounded-lg bg-white/15 px-3 py-1.5 font-ui text-xs text-white transition-all hover:bg-white/25"
+          >
+            Settings
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/manageAgents')}
+            className="rounded-lg bg-white/15 px-3 py-1.5 font-ui text-xs text-white transition-all hover:bg-white/25"
+          >
+            Manage Agents
+          </button>
+
+          
       </>
     )}
     <button

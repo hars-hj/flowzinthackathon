@@ -154,26 +154,25 @@ export function SettingsPage() {
             {user?.email}
           </span>
 
-          <button
-            type="button"
-            onClick={() => navigate('/analytics')}
-            className="rounded-lg border border-border px-3 py-1.5 font-ui text-xs text-text-secondary transition-all duration-150 hover:bg-accent-light hover:text-accent"
-          >
+           <button onClick={() => navigate('/analytics')} className='rounded-lg border border-border px-3 py-1.5 font-ui text-xs text-text-secondary transition-all duration-150 hover:bg-accent-light hover:text-accent'>
             Analytics
           </button>
-          <button
-            type="button"
-            onClick={() => navigate('/dashboard')}
-            className="rounded-lg border border-border px-3 py-1.5 font-ui text-xs text-text-secondary transition-all duration-150 hover:bg-accent-light hover:text-accent"
-          >
+          <button onClick={() => navigate('/dashboard')} className='rounded-lg border border-border px-3 py-1.5 font-ui text-xs text-text-secondary transition-all duration-150 hover:bg-accent-light hover:text-accent'>
             Tickets
           </button>
           <button
             type="button"
             onClick={() => navigate('/settings')}
-            className="rounded-lg border border-accent bg-accent-light px-3 py-1.5 font-ui text-xs font-medium text-accent"
+            className="rounded-lg border border-border px-3 py-1.5 font-ui text-xs text-text-secondary transition-all duration-150 hover:bg-accent-light hover:text-accent"
           >
             Settings
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/manageAgents')}
+            className="rounded-lg border border-border px-3 py-1.5 font-ui text-xs text-text-secondary transition-all duration-150 hover:bg-accent-light hover:text-accent"
+          >
+            Manage Agents
           </button>
           <button
             type="button"

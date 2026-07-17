@@ -9,7 +9,7 @@ import { AnalyticsPage } from './pages/AnalyticsPage'
 import { AgentDashboard } from './pages/AgentDashBoard'
 import { SettingsPage } from './pages/settingsPage'
 import {AgentOnlyDashboard} from './pages/AgentsPage'
-import{ AgentsPage } from './pages/createAgent'
+import{ AgentsPage } from './pages/manageAgents'
 
 function App() {
   return (
