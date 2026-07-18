@@ -67,12 +67,11 @@ export async function sendUserMessage(orgId: string, ticketId: string, content: 
 //   return data;
 // }
 
-export async function claimTicket(ticketId: string, agentId: string, orgId: string) {
+export async function claimTicket(ticketId: string, agentId: string) {
   const { data, error } = await supabaseAdmin
     .from('support_tickets')
     .update({ status: 'in_progress', assigned_agent_id: agentId, updated_at: new Date().toISOString() })
     .eq('id', ticketId)
-    .eq('org_id', orgId)
     .eq('status', 'waiting')
     .select()
     .single();
@@ -81,34 +80,31 @@ export async function claimTicket(ticketId: string, agentId: string, orgId: stri
   return data;
 }
 
-export async function resolveTicket(ticketId: string, orgId: string) {
+export async function resolveTicket(ticketId: string) {
   const { data, error } = await supabaseAdmin
     .from('support_tickets')
     .update({ status: 'resolved', updated_at: new Date().toISOString() })
     .eq('id', ticketId)
-    .eq('org_id', orgId)
     .select()
     .single();
   if (error) throw error;
   return data;
 }
 
-export async function getWaitingTickets(orgId: string) {
+export async function getWaitingTickets() {
   const { data, error } = await supabaseAdmin
     .from('support_tickets')
     .select('*')
-    .eq('org_id', orgId)
     .eq('status', 'waiting')
     .order('created_at', { ascending: true });
   if (error) throw error;
   return data;
 }
 
-export async function getActiveTickets(orgId: string, agentId: string, role: string) {
+export async function getActiveTickets(agentId: string, role: string) {
   let query = supabaseAdmin
     .from('support_tickets')
     .select('*')
-    .eq('org_id', orgId)
     .eq('status', 'in_progress');
 
   if (role !== 'admin') {
@@ -120,11 +116,10 @@ export async function getActiveTickets(orgId: string, agentId: string, role: str
   return data;
 }
 
-export async function getResolvedTickets(orgId: string, agentId: string, role: string) {
+export async function getResolvedTickets(agentId: string, role: string) {
   let query = supabaseAdmin
     .from('support_tickets')
     .select('*')
-    .eq('org_id', orgId)
     .eq('status', 'resolved');
 
   if (role !== 'admin') {
@@ -136,16 +131,7 @@ export async function getResolvedTickets(orgId: string, agentId: string, role: s
   return data;
 }
 
-export async function sendTicketMessage(ticketId: string, orgId: string, senderId: string | null, senderRole: string, content: string) {
-  // Confirm the ticket actually belongs to this org before writing to it
-  const { data: ticket } = await supabaseAdmin
-    .from('support_tickets')
-    .select('id')
-    .eq('id', ticketId)
-    .eq('org_id', orgId)
-    .single();
-  if (!ticket) throw new Error('Ticket not found');
-
+export async function sendTicketMessage(ticketId: string, senderId: string | null, senderRole: string, content: string) {
   const { data, error } = await supabaseAdmin
     .from('ticket_messages')
     .insert({ ticket_id: ticketId, sender_id: senderId, sender_role: senderRole, content })
@@ -155,16 +141,7 @@ export async function sendTicketMessage(ticketId: string, orgId: string, senderI
   return data;
 }
 
-export async function getTicketMessages(ticketId: string, orgId: string) {
-  // Confirm the ticket actually belongs to this org before reading its messages
-  const { data: ticket } = await supabaseAdmin
-    .from('support_tickets')
-    .select('id')
-    .eq('id', ticketId)
-    .eq('org_id', orgId)
-    .single();
-  if (!ticket) throw new Error('Ticket not found');
-
+export async function getTicketMessages(ticketId: string) {
   const { data, error } = await supabaseAdmin
     .from('ticket_messages')
     .select('*')

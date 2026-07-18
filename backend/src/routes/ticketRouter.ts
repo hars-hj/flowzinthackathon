@@ -10,16 +10,6 @@ import {
   getTicketBySession, getTicketByEmail, sendUserMessage
 } from '../controllers/ticket.controller.js';
 
-// alongside your existing resolveOrgId(widgetKey) helper
-async function resolveUserOrgId(userId: string): Promise<string | null> {
-  const { data: member } = await supabaseAdmin
-    .from('organization_members')
-    .select('org_id')
-    .eq('user_id', userId)
-    .single();
-  return member?.org_id ?? null;
-}
-
 const router = express.Router();
 
 async function resolveOrgId(widgetKey: string): Promise<string | null> {
@@ -63,7 +53,7 @@ router.get('/:id/public-messages', async (req, res) => {
       .single();
     if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
 
-    const messages = await getTicketMessages(req.params.id, orgId); // already exists in your controller
+    const messages = await getTicketMessages(req.params.id); // already exists in your controller
     return res.json({ messages });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch messages' });
@@ -118,12 +108,9 @@ router.get('/lookup', async (req, res) => {
   }
 });
 
-router.get('/inbox', authenticateToken, async (req: AuthenticatedRequest, res) => {
+router.get('/inbox', authenticateToken, async (req, res) => {
   try {
-    const orgId = await resolveUserOrgId(req.user!.id);
-    if (!orgId) return res.status(403).json({ error: 'No organization found for user' });
-
-    const tickets = await getWaitingTickets(orgId);
+    const tickets = await getWaitingTickets();
     return res.json({ tickets });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch inbox' });
@@ -132,10 +119,7 @@ router.get('/inbox', authenticateToken, async (req: AuthenticatedRequest, res) =
 
 router.get('/active', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
-    const orgId = await resolveUserOrgId(req.user!.id);
-    if (!orgId) return res.status(403).json({ error: 'No organization found for user' });
-
-    const tickets = await getActiveTickets(orgId, req.user!.id, req.user!.role);
+    const tickets = await getActiveTickets(req.user!.id, req.user!.role);
     return res.json({ tickets });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch active tickets' });
@@ -144,10 +128,7 @@ router.get('/active', authenticateToken, async (req: AuthenticatedRequest, res) 
 
 router.get('/resolved', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
-    const orgId = await resolveUserOrgId(req.user!.id);
-    if (!orgId) return res.status(403).json({ error: 'No organization found for user' });
-
-    const tickets = await getResolvedTickets(orgId, req.user!.id, req.user!.role);
+    const tickets = await getResolvedTickets(req.user!.id, req.user!.role);
     return res.json({ tickets });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch resolved tickets' });
@@ -156,10 +137,7 @@ router.get('/resolved', authenticateToken, async (req: AuthenticatedRequest, res
 
 router.post('/:id/claim', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
-    const orgId = await resolveUserOrgId(req.user!.id);
-    if (!orgId) return res.status(403).json({ error: 'No organization found for user' });
-
-    const ticket = await claimTicket(req.params.id, req.user!.id, orgId);
+    const ticket = await claimTicket(req.params.id, req.user!.id);
     broadcastTicketClaimed(ticket);
     return res.json({ ticket });
   } catch (err) {
@@ -167,12 +145,9 @@ router.post('/:id/claim', authenticateToken, async (req: AuthenticatedRequest, r
   }
 });
 
-router.get('/:id/messages', authenticateToken, async (req: AuthenticatedRequest, res) => {
+router.get('/:id/messages', authenticateToken, async (req, res) => {
   try {
-    const orgId = await resolveUserOrgId(req.user!.id);
-    if (!orgId) return res.status(403).json({ error: 'No organization found for user' });
-
-    const messages = await getTicketMessages(req.params.id, orgId);
+    const messages = await getTicketMessages(req.params.id);
     return res.json({ messages });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch messages' });
@@ -181,13 +156,9 @@ router.get('/:id/messages', authenticateToken, async (req: AuthenticatedRequest,
 
 router.post('/:id/messages', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
-    const orgId = await resolveUserOrgId(req.user!.id);
-    if (!orgId) return res.status(403).json({ error: 'No organization found for user' });
-
     const { content, senderRole } = req.body;
     if (!content) return res.status(400).json({ error: 'Missing content' });
-
-    const message = await sendTicketMessage(req.params.id, orgId, req.user!.id, senderRole ?? 'agent', content);
+    const message = await sendTicketMessage(req.params.id, req.user!.id, senderRole ?? 'agent', content);
     broadcastNewMessage(req.params.id, message);
     return res.status(201).json({ message });
   } catch (err) {
@@ -195,12 +166,9 @@ router.post('/:id/messages', authenticateToken, async (req: AuthenticatedRequest
   }
 });
 
-router.post('/:id/resolve', authenticateToken, async (req: AuthenticatedRequest, res) => {
+router.post('/:id/resolve', authenticateToken, async (req, res) => {
   try {
-    const orgId = await resolveUserOrgId(req.user!.id);
-    if (!orgId) return res.status(403).json({ error: 'No organization found for user' });
-
-    const ticket = await resolveTicket(req.params.id, orgId);
+    const ticket = await resolveTicket(req.params.id);
     broadcastTicketResolved(ticket);
     return res.json({ ticket });
   } catch (err) {
@@ -208,16 +176,12 @@ router.post('/:id/resolve', authenticateToken, async (req: AuthenticatedRequest,
   }
 });
 
-router.get('/:id/context', authenticateToken, async (req: AuthenticatedRequest, res) => {
+router.get('/:id/context', authenticateToken, async (req, res) => {
   try {
-    const orgId = await resolveUserOrgId(req.user!.id);
-    if (!orgId) return res.status(403).json({ error: 'No organization found for user' });
-
     const { data: ticket, error: ticketError } = await supabaseAdmin
       .from('support_tickets')
       .select('session_id')
       .eq('id', req.params.id)
-      .eq('org_id', orgId)
       .single();
 
     if (ticketError || !ticket) return res.status(404).json({ error: 'Ticket not found' });
