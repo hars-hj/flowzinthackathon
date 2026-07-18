@@ -228,7 +228,7 @@ export function SettingsPage() {
 
               <div className="mb-4 rounded-lg border border-border bg-surface-muted px-4 py-3">
                 <code className="break-all font-mono text-xs text-text-primary">
-                  {`<script src="https://cdn.nexasupport.com/widget.js" data-widget-key="${org?.widget_key ?? ''}"></script>`}
+                  {`<script src="https://cdn.nexasupport.com/widget.js" data-org="${org?.widget_key ?? ''}"></script>`}
                 </code>
               </div>
 

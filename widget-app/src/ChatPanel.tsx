@@ -49,6 +49,8 @@ interface ChatPanelProps {
 
 type TicketStatus = "none" | "waiting" | "in_progress" | "resolved";
 
+
+
 function getStoredEmail(orgKey: string): string | null {
   return localStorage.getItem(`ybot_email_${orgKey}`);
 }
@@ -66,6 +68,23 @@ function ChatPanel({ orgKey, sessionId, config }: ChatPanelProps) {
   const [isEscalating, setIsEscalating] = useState(false);
   const [showEmailPrompt, setShowEmailPrompt] = useState(false);
   const [emailInput, setEmailInput] = useState("");
+
+  async function handleEscalateClick() {
+  if (ticketId && ticketStatus !== "resolved") return; // block only while a ticket is actively open
+  const storedEmail = orgKey ? getStoredEmail(orgKey) : null;
+  if (!storedEmail) {
+    setShowEmailPrompt(true);
+    return;
+  }
+  await createTicket(storedEmail);
+}
+
+function handleStartNewChat() {
+  setMessages([]);
+  setTicketId(null);
+  setTicketStatus("none");
+  setInput("");
+}
 
   useEffect(() => {
     if (!sessionId || !orgKey) return;
@@ -183,15 +202,7 @@ function ChatPanel({ orgKey, sessionId, config }: ChatPanelProps) {
 }
 
   // --- Escalation: prompts for email first, then creates the ticket ---
-  async function handleEscalateClick() {
-    if (ticketId) return;
-    const storedEmail = orgKey ? getStoredEmail(orgKey) : null;
-    if (!storedEmail) {
-      setShowEmailPrompt(true);
-      return;
-    }
-    await createTicket(storedEmail);
-  }
+
 
   async function createTicket(email?: string) {
     if (!orgKey || !sessionId) return;
@@ -268,24 +279,25 @@ function ChatPanel({ orgKey, sessionId, config }: ChatPanelProps) {
         )}
       </div>
 
-      {/* Talk to a human — hidden once a ticket exists */}
-      {ticketStatus === "none" && messages.length > 0 && (
-        <button
-          onClick={handleEscalateClick}
-          disabled={isEscalating}
-          style={{
-            margin: "8px 0",
-            padding: "8px 12px",
-            borderRadius: "8px",
-            border: "1px solid #ddd",
-            background: "#fff",
-            cursor: "pointer",
-            fontSize: "13px",
-            color: "#555",
-          }}
-        >
-          {isEscalating ? "Connecting..." : "Talk to a human"}
-        </button>
+      {(ticketStatus === "none" || ticketStatus === "resolved") && messages.length > 0 && (
+        <div style={{ display: "flex", gap: "8px", margin: "8px 0" }}>
+          <button
+            onClick={handleEscalateClick}
+            disabled={isEscalating}
+            style={{ padding: "8px 12px", borderRadius: "8px", border: "1px solid #ddd", background: "#fff", cursor: "pointer", fontSize: "13px", color: "#555" }}
+          >
+            {isEscalating ? "Connecting..." : "Talk to a human"}
+          </button>
+
+          {ticketStatus === "resolved" && (
+            <button
+              onClick={handleStartNewChat}
+              style={{ padding: "8px 12px", borderRadius: "8px", border: "1px solid #ddd", background: "#fff", cursor: "pointer", fontSize: "13px", color: "#555" }}
+            >
+              Start New Chat
+            </button>
+          )}
+        </div>
       )}
 
       {/* Email prompt, shown before first-ever escalation */}
@@ -323,13 +335,11 @@ function ChatPanel({ orgKey, sessionId, config }: ChatPanelProps) {
           value={input}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInput(e.target.value)}
           onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => e.key === "Enter" && sendMessage(input)}
-          placeholder={ticketStatus === "resolved" ? "This chat has ended" : "Type a message..."}
-          disabled={ticketStatus === "resolved"}
+          placeholder="Type a message..."
           style={{ flex: 1, padding: "8px", borderRadius: "8px", border: "1px solid #ddd" }}
         />
         <button
           onClick={() => sendMessage(input)}
-          disabled={ticketStatus === "resolved"}
           style={{ padding: "8px 14px", borderRadius: "8px", background: config.primary_color, color: "white", border: "none" }}
         >
           Send
