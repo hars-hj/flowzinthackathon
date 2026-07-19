@@ -1,11 +1,22 @@
 import express from 'express';
-import { authenticateToken } from '../middleware/auth.middleware.js';
+import { AuthenticatedRequest, authenticateToken } from '../middleware/auth.middleware.js';
 //import { requireUser } from '../middleware/role.middleware.js';
 //import { chatHandler, getSessionsHandler, deleteSessionHandler } from '../controllers/chatbotController.js';
 import { embedQuery, retrieveChunks ,chat} from '../controllers/ragService.js';
 import { supabaseAdmin } from '../lib/supabaseClient.js';
 import { chatHandler } from '../controllers/chatController.widget.js';
 const router = express.Router();
+
+async function resolveOrgIdForUser(userId: string): Promise<string | null> {
+  const { data, error } = await supabaseAdmin
+    .from("organization_members")
+    .select("org_id")
+    .eq("user_id", userId)
+    .single();
+
+  if (error || !data) return null;
+  return data.org_id;
+}
 
 router.post('/', chatHandler);
 
@@ -32,10 +43,17 @@ router.post('/', chatHandler);
 //   });
 // });
 
-router.get("/analytics", authenticateToken, async (req, res) => {
+
+router.get("/analytics", authenticateToken, async (req:AuthenticatedRequest, res) => {
+  const orgId = await resolveOrgIdForUser(req.user!.id);
+  if (!orgId) {
+    return res.status(403).json({ error: "No organization found for this user" });
+  }
+
   const { data, error } = await supabaseAdmin
     .from("query_logs")
     .select("*")
+    .eq("org_id", orgId)
     .order("created_at", { ascending: false });
 
   if (error) return res.status(500).json({ error: error.message });
@@ -64,5 +82,4 @@ router.get("/analytics", authenticateToken, async (req, res) => {
     recent_queries: data.slice(0, 20),
   });
 });
-
 export default router;
