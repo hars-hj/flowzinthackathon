@@ -1,4 +1,5 @@
 const AUTH_STORAGE_KEY = 'nexasupport_auth'
+const BASE_URL = import.meta.env.VITE_BACKEND_URL || ''
 
 export interface StoredAuth {
   accessToken: string
@@ -39,7 +40,7 @@ export async function refreshSession(): Promise<StoredAuth | null> {
     return null
   }
 
-  const res = await fetch('/api/auth/refresh', {
+  const res = await fetch(`${BASE_URL}/api/auth/refresh`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ refreshToken: stored.refreshToken }),
@@ -83,14 +84,14 @@ export async function apiFetch<T>(
     headers.set('Authorization', `Bearer ${token}`)
   }
 
-  const res = await fetch(path, { ...options, headers })
+  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers })
 
   if (res.status === 401) {
     const refreshed = await refreshSession()
     if (refreshed) {
       const retryHeaders = new Headers(options.headers)
       retryHeaders.set('Authorization', `Bearer ${refreshed.accessToken}`)
-      const retryRes = await fetch(path, {
+      const retryRes = await fetch(`${BASE_URL}${path}`, {
         ...options,
         headers: retryHeaders,
       })
