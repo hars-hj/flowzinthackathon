@@ -1,7 +1,8 @@
 import { Groq } from "groq-sdk";
 import { supabaseAdmin } from '../lib/supabaseClient.js';
 import { GoogleGenAI } from "@google/genai/web";
-
+import { getTicketBySession } from './ticket.controller.js';
+import { handleCasualQuery } from './casualQueryHandler.js';
 // --- Clients ---
 const embeddingsModel = new GoogleGenAI({
   apiKey: process.env.EMBEDING_API_KEY!,
@@ -33,6 +34,11 @@ interface ChatResult {
 
 const NO_CONTEXT_ANSWER = "I don't have that information, please contact our support team.";
 const FALLBACK_ANSWER = "Sorry, I'm having trouble answering right now — please try again later or contact our team";
+
+export async function isSessionEscalated(orgId: string, sessionId: string): Promise<boolean> {
+  const ticket = await getTicketBySession(orgId, sessionId);
+  return !!ticket && ticket.status !== 'resolved';
+}
 
 // --- Embed the user's question ---
 export async function embedQuery(question: string): Promise<number[]> {
@@ -253,13 +259,52 @@ async function getSupportContact(orgId: string): Promise<string> {
 
 // --- Main exported function: the full RAG pipeline, org-scoped ---
 export async function chat(orgId: string, sessionId: string, question: string): Promise<ChatResult> {
-  const start = Date.now();
+    const start = Date.now();
   console.log("[ragService] chat started", { orgId, sessionId, question });
   try {
+    // --- 1. Escalation guard ---
+    const escalated = await isSessionEscalated(orgId, sessionId);
+    if (escalated) {
+      console.log("[ragService] session escalated, skipping RAG", { orgId, sessionId });
+      await saveMessage(orgId, sessionId, "user", question);
+      await logQuery({
+        orgId,
+        sessionId,
+        question,
+        chunksRetrieved: 0,
+        topChunkScore: 0,
+        finalAnswer: "",
+        latencyMs: Date.now() - start,
+        escalated: true,
+      });
+      return { reply: "", escalated: true };
+    }
+
+    // --- 2. Casual query shortcut ---
+    const casual = handleCasualQuery(question);
+    if (casual.ok) {
+      console.log("[ragService] casual query matched, skipping RAG", { question });
+      await saveMessage(orgId, sessionId, "user", question);
+      await saveMessage(orgId, sessionId, "assistant", casual.message);
+      await logQuery({
+        orgId,
+        sessionId,
+        question,
+        chunksRetrieved: 0,
+        topChunkScore: 0,
+        finalAnswer: casual.message,
+        latencyMs: Date.now() - start,
+        escalated: false,
+      });
+      return { reply: casual.message, escalated: false };
+    }
+
+    // --- everything below this line is unchanged ---
     const [queryEmbedding, supportContact] = await Promise.all([
       embedQuery(question),
       getSupportContact(orgId),
     ]);
+
     console.log("[ragService] embedding and support contact resolved", { supportContact });
     const keywords = question.split(" ").slice(0, 6).join(" | ");
 
