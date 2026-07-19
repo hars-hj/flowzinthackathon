@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Clock, Ticket as TicketIcon, CheckCircle, Users, LogOut, Shield } from 'lucide-react'
+import { Clock, Ticket as TicketIcon, CheckCircle, Users, LogOut, Shield, Ad } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { getInbox, getActiveTickets, getResolvedTickets, claimTicket } from '../api/tickets'
 import { getSocket } from '../lib/socket'
 import type { Ticket } from '../types/ticket'
 import { TicketChatPanel } from '../components/TicketChatPanel'
-
+import {AdminHeader} from '../components/adminHeader'
 type Tab = 'inbox' | 'active' | 'resolved'
 
 export function AgentDashboard() {
@@ -110,61 +110,7 @@ export function AgentDashboard() {
 
   return (
     <div className="flex min-h-full flex-col bg-background">
-      <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-gradient-to-r from-accent to-accent-dark px-4 md:px-6">
-  <div>
-    <h1 className="font-ui text-lg font-semibold text-white">Dashboard</h1>
-    <div className="flex items-center gap-1.5">
-      <RoleIcon className="h-3.5 w-3.5 text-white/80" strokeWidth={2} />
-      <span className="font-ui text-xs text-white/80">{roleLabel}</span>
-    </div>
-  </div>
-
-  <div className="flex items-center gap-2">
-    {role === 'admin' && (
-      <>
-        <button
-          onClick={() => navigate('/analytics')}
-          className="rounded-lg bg-white/15 px-3 py-1.5 font-ui text-xs text-white transition-all hover:bg-white/25"
-          >
-            Analytics
-          </button>
-
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="rounded-lg bg-white/15 px-3 py-1.5 font-ui text-xs text-white transition-all hover:bg-white/25"
-          >
-            Tickets
-          </button>
-
-          <button
-            type="button"
-            onClick={() => navigate('/settings')}
-            className="rounded-lg bg-white/15 px-3 py-1.5 font-ui text-xs text-white transition-all hover:bg-white/25"
-          >
-            Settings
-          </button>
-
-          <button
-            type="button"
-            onClick={() => navigate('/manageAgents')}
-            className="rounded-lg bg-white/15 px-3 py-1.5 font-ui text-xs text-white transition-all hover:bg-white/25"
-          >
-            Manage Agents
-          </button>
-
-          
-      </>
-    )}
-    <button
-      type="button"
-      onClick={handleLogout}
-      className="flex items-center gap-1.5 rounded-lg bg-white/15 px-3 py-1.5 font-ui text-xs text-white transition-all hover:bg-white/25"
-    >
-      <LogOut className="h-3.5 w-3.5" strokeWidth={2} />
-      Sign out
-    </button>
-  </div>
-</header>
+      <AdminHeader />
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 md:px-6">
 

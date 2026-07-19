@@ -2,7 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import LandingPage from './components/background/LandingPage'
 import { LoginPage } from './pages/LoginPage'
 import { SignupPage } from './pages/SignupPage'
-import { ChatPage } from './pages/ChatPage'
+//import { ChatPage } from './pages/ChatPage'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { AdminPage } from './pages/AdminPage'
 import { AnalyticsPage } from './pages/AnalyticsPage'
@@ -17,22 +17,15 @@ function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
       <Route path="/" element={<LandingPage />} />
-      <Route
+      {/* <Route
         path="/chats"
         element={
           <ProtectedRoute>
             <ChatPage />
           </ProtectedRoute>
         }
-      />
-      <Route
-        path="/chat"
-        element={
-          <ProtectedRoute>
-            <ChatPage />
-          </ProtectedRoute>
-        }
-      />
+      /> */}
+    
       <Route
         path="/admin"
         element={

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { apiFetch } from '../api/client'
+import {AdminHeader} from '../components/adminHeader'
 // ---------- types ----------
 interface QueryLog {
   id: string
@@ -197,31 +198,7 @@ export function AnalyticsPage() {
     <div className="flex min-h-full flex-col bg-background">
 
       {/* header */}
-      <header className="flex h-16 shrink-0 items-center border-b border-border bg-surface px-4 md:px-6">
-        <button
-          type="button"
-          onClick={() => navigate('/admin')}
-          className="mr-3 flex h-8 w-8 items-center justify-center rounded-lg text-text-hint transition-all hover:bg-surface-muted hover:text-text-secondary"
-        >
-          <ArrowLeft className="h-4 w-4" strokeWidth={2} />
-        </button>
-        <div className="flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-accent" />
-          <span className="font-ui text-base font-medium text-text-primary">Analytics</span>
-        </div>
-        <div className="ml-auto flex items-center gap-3">
-          <span className="hidden font-ui text-xs text-text-secondary sm:inline">{user?.email}</span>
-          <button
-            type="button"
-            onClick={() => load(true)}
-            disabled={refreshing}
-            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 font-ui text-xs text-text-secondary transition-all hover:bg-accent-light hover:text-accent disabled:opacity-50"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} strokeWidth={2} />
-            Refresh
-          </button>
-        </div>
-      </header>
+      <AdminHeader />
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 md:px-6">
 

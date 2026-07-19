@@ -14,6 +14,7 @@ import {
   type Agent,
 } from '../api/manageAgents'
 import { useAuth } from '../context/AuthContext'
+import { AdminHeader } from '../components/adminHeader'
 
 export function AgentsPage() {
   const navigate = useNavigate()
@@ -104,57 +105,7 @@ export function AgentsPage() {
 
   return (
     <div className="flex min-h-full flex-col bg-background">
-      <header className="flex h-16 shrink-0 items-center border-b border-border bg-surface px-4 md:px-6">
-        <div className="flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-accent" />
-          <span className="font-ui text-base font-medium text-text-primary">
-            NexaSupport Admin
-          </span>
-        </div>
-        <div className="ml-auto flex items-center gap-3">
-          <span className="hidden font-ui text-xs text-text-secondary sm:inline">
-            {user?.email}
-          </span>
-
-          <button
-            type="button"
-            onClick={() => navigate('/analytics')}
-            className="rounded-lg border border-border px-3 py-1.5 font-ui text-xs text-text-secondary transition-all duration-150 hover:bg-accent-light hover:text-accent"
-          >
-            Analytics
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/dashboard')}
-            className="rounded-lg border border-border px-3 py-1.5 font-ui text-xs text-text-secondary transition-all duration-150 hover:bg-accent-light hover:text-accent"
-          >
-            Tickets
-          </button>
-          
-          <button
-            type="button"
-            onClick={() => navigate('/settings')}
-            className="rounded-lg border border-border px-3 py-1.5 font-ui text-xs text-text-secondary transition-all duration-150 hover:bg-accent-light hover:text-accent"
-          >
-            Settings
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/manageAgents')}
-            className="rounded-lg border border-accent bg-accent-light px-3 py-1.5 font-ui text-xs font-medium text-accent"
-          >
-            Manage Agents
-          </button>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-text-hint transition-all duration-150 hover:bg-surface-muted hover:text-text-secondary"
-            aria-label="Log out"
-          >
-            <LogOut className="h-4 w-4" strokeWidth={2} />
-          </button>
-        </div>
-      </header>
+      <AdminHeader />
 
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 md:px-6">
         <div className="mb-8">
