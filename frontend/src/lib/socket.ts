@@ -16,11 +16,11 @@ export function getSocket(): Socket {
       console.log('Socket connected:', socket?.id)
     })
 
-    socket.on('disconnect', (reason) => {
+      socket.on('disconnect', (reason: Socket.DisconnectReason) => {
       console.log('Socket disconnected:', reason)
     })
 
-    socket.on('connect_error', (err) => {
+    socket.on('connect_error', (err: Error) => {
       console.error('Socket connection error:', err.message)
     })
   }
