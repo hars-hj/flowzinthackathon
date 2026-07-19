@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+// import { useNavigate } from 'react-router-dom'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import {
-  ArrowLeft, RefreshCw, Zap, Clock, AlertTriangle,
+   RefreshCw, Zap, Clock, AlertTriangle,
   MessageSquare, TrendingUp, CheckCircle, XCircle, AlertCircle,
 } from 'lucide-react'
-import { useAuth } from '../context/AuthContext'
+// import { useAuth } from '../context/AuthContext'
 import { apiFetch } from '../api/client'
 import {AdminHeader} from '../components/adminHeader'
 // ---------- types ----------
@@ -164,8 +164,8 @@ function ChartTooltip({ active, payload, label }: any) {
 
 // ---------- main page ----------
 export function AnalyticsPage() {
-  const navigate = useNavigate()
-  const { user } = useAuth()
+  // const navigate = useNavigate()
+  // const { user } = useAuth()
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [logs, setLogs] = useState<QueryLog[]>([])
   const [loading, setLoading] = useState(true)

@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { FileText, LogOut, Upload, RefreshCw } from 'lucide-react'
+// import { useNavigate } from 'react-router-dom'
+import { FileText, Upload, RefreshCw } from 'lucide-react'
 import { listFiles, uploadPdf, type UploadedFile } from '../api/upload'
 import { useAuth } from '../context/AuthContext'
 import { AdminHeader } from '../components/adminHeader'
 
 export function AdminPage() {
-  const navigate = useNavigate()
-  const { user, logout } = useAuth()
+
+  const { user } = useAuth()
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [isLoadingFiles, setIsLoadingFiles] = useState(true)
   const [isUploading, setIsUploading] = useState(false)
@@ -56,11 +56,7 @@ export function AdminPage() {
     }
   }
 
-  const handleLogout = () => {
-    logout()
-    navigate('/login', { replace: true })
-  }
-
+ 
   const initials = user?.email?.slice(0, 2).toUpperCase() ?? 'AD'
 
   return (

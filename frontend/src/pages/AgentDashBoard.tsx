@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Clock, Ticket as TicketIcon, CheckCircle, Users, LogOut, Shield, Ad } from 'lucide-react'
+// import { useNavigate } from 'react-router-dom'
+import { Clock, Ticket as TicketIcon, CheckCircle, Users } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { getInbox, getActiveTickets, getResolvedTickets, claimTicket } from '../api/tickets'
 import { getSocket } from '../lib/socket'
@@ -10,8 +10,8 @@ import {AdminHeader} from '../components/adminHeader'
 type Tab = 'inbox' | 'active' | 'resolved'
 
 export function AgentDashboard() {
-  const navigate = useNavigate()
-  const { user, logout } = useAuth()
+  // const navigate = useNavigate()
+  const { user } = useAuth()
   const [tab, setTab] = useState<Tab>('inbox')
   const [inbox, setInbox] = useState<Ticket[]>([])
   const [active, setActive] = useState<Ticket[]>([])
@@ -21,7 +21,7 @@ export function AgentDashboard() {
   const [claimingId, setClaimingId] = useState<string | null>(null)
 
   const role = user?.role ?? 'agent'
-  const team = (user as any)?.team as string | null
+  // const team = (user as any)?.team as string | null
 
   const loadAll = useCallback(async () => {
     setLoading(true)
@@ -83,15 +83,15 @@ export function AgentDashboard() {
     }
   }
 
-  const handleLogout = () => {
-    logout()
-    navigate('/login', { replace: true })
-  }
+  // const handleLogout = () => {
+  //   logout()
+  //   navigate('/login', { replace: true })
+  // }
 
   const myActiveCount = active.length
 
-  const roleLabel = role === 'admin' ? 'Admin' : `Agent — ${team ?? ''}`
-  const RoleIcon = role === 'admin' ? Shield : Users
+  // const roleLabel = role === 'admin' ? 'Admin' : `Agent — ${team ?? ''}`
+  // const RoleIcon = role === 'admin' ? Shield : Users
 
   const list = tab === 'inbox' ? inbox : tab === 'active' ? active : resolved
 

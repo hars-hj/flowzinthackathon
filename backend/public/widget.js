@@ -28,14 +28,24 @@
       : 'right: 20px;';
 
     // 3. Create the floating bubble button
-    const bubble = document.createElement('button');
+   const bubble = document.createElement('button');
 bubble.id = 'yourbot-bubble';
 
-// Use the configured avatar if one is set, otherwise fall back to the emoji icon
+// Use the configured avatar if one is set, otherwise fall back to the SVG icon
+const dotColor = config.primary_color || '#5A2EFF';
 bubble.innerHTML = config.avatar_url
   ? `<img src="${config.avatar_url}" alt="" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" />`
-  : '💬';
+  : `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path
+        d="M4 12c0-4.418 3.582-8 8-8s8 3.582 8 8-3.582 8-8 8c-1.06 0-2.07-.207-2.995-.582L5 20l1.243-3.73A7.96 7.96 0 0 1 4 12Z"
+        fill="white"
+      />
+      <circle cx="8.5" cy="12" r="1.2" fill="${dotColor}" />
+      <circle cx="12" cy="12" r="1.2" fill="${dotColor}" />
+      <circle cx="15.5" cy="12" r="1.2" fill="${dotColor}" />
+    </svg>`;
 
+    
 bubble.style.cssText = `
   position: fixed;
   bottom: 20px;

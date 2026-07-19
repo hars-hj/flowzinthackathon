@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+// import { useNavigate } from 'react-router-dom'
 import {
   Settings as SettingsIcon,
   Copy,
   Check,
   RefreshCw,
-  LogOut,
+
   Plus,
   X,
 } from 'lucide-react'
@@ -32,8 +32,8 @@ const DEFAULT_CONFIG: Omit<WidgetConfig, 'org_id' | 'updated_at'> = {
 }
 
 export function SettingsPage() {
-  const navigate = useNavigate()
-  const { user, logout } = useAuth()
+  // const navigate = useNavigate()
+  const { user } = useAuth()
 
   const [org, setOrg] = useState<Organization | null>(null)
   const [config, setConfig] = useState(DEFAULT_CONFIG)
@@ -134,10 +134,10 @@ export function SettingsPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const handleLogout = () => {
-    logout()
-    navigate('/login', { replace: true })
-  }
+  // const handleLogout = () => {
+  //   logout()
+  //   navigate('/login', { replace: true })
+  // }
 
   const initials = user?.email?.slice(0, 2).toUpperCase() ?? 'AD'
 
