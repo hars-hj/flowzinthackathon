@@ -378,6 +378,7 @@ function ChatPanel({ orgKey, sessionId, config, onResetSession }: ChatPanelProps
                 border: m.sender === "user" ? "none" : "1px solid #2a2a32",
                 color: m.sender === "user" ? "white" : "#e4e4e7",
                 fontSize: "14px",
+                textAlign: "left",
                 maxWidth: "75%",
                 whiteSpace: "pre-wrap",
                 wordBreak: "break-word",

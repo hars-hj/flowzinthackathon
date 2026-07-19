@@ -259,11 +259,16 @@ async function getSupportContact(orgId: string): Promise<string> {
 
 // --- Main exported function: the full RAG pipeline, org-scoped ---
 export async function chat(orgId: string, sessionId: string, question: string): Promise<ChatResult> {
-    const start = Date.now();
+  const start = Date.now();
   console.log("[ragService] chat started", { orgId, sessionId, question });
   try {
     // --- 1. Escalation guard ---
+    // Measure the time taken for escalation checking.
+    const escalationStart = Date.now();
     const escalated = await isSessionEscalated(orgId, sessionId);
+    const escalationMs = Date.now() - escalationStart;
+    console.log("[ragService] escalation guard completed", { escalationMs });
+
     if (escalated) {
       console.log("[ragService] session escalated, skipping RAG", { orgId, sessionId });
       await saveMessage(orgId, sessionId, "user", question);
@@ -281,7 +286,12 @@ export async function chat(orgId: string, sessionId: string, question: string): 
     }
 
     // --- 2. Casual query shortcut ---
+    // Measure the time taken for the casual-query shortcut check.
+    const casualStart = Date.now();
     const casual = handleCasualQuery(question);
+    const casualMs = Date.now() - casualStart;
+    console.log("[ragService] casual query check completed", { casualMs });
+
     if (casual.ok) {
       console.log("[ragService] casual query matched, skipping RAG", { question });
       await saveMessage(orgId, sessionId, "user", question);
@@ -299,26 +309,33 @@ export async function chat(orgId: string, sessionId: string, question: string): 
       return { reply: casual.message, escalated: false };
     }
 
-    // --- everything below this line is unchanged ---
+    // --- 3. Embedding and support lookup ---
+    // Measure the time taken for embedding generation and support-contact lookup.
+    const embeddingStart = Date.now();
     const [queryEmbedding, supportContact] = await Promise.all([
       embedQuery(question),
       getSupportContact(orgId),
     ]);
+    const embeddingMs = Date.now() - embeddingStart;
 
-    console.log("[ragService] embedding and support contact resolved", { supportContact });
+    console.log("[ragService] embedding and support contact resolved", { supportContact, embeddingMs });
     const keywords = question.split(" ").slice(0, 6).join(" | ");
 
+    // --- 4. Retrieval and history lookup ---
+    // Measure the time taken for chunk retrieval and conversation-history lookup.
+    const retrievalStart = Date.now();
     const [rawChunks, history] = await Promise.all([
       retrieveChunks(orgId, queryEmbedding, keywords),
       getConversationHistory(orgId, sessionId),
     ]);
-    console.log("[ragService] retrieved chunks and history", { rawChunkCount: rawChunks.length, historyLength: history.length });
+    const retrievalMs = Date.now() - retrievalStart;
+    console.log("[ragService] retrieved chunks and history", { rawChunkCount: rawChunks.length, historyLength: history.length, retrievalMs });
 
     if (!rawChunks || rawChunks.length === 0) {
       console.log("[ragService] no chunks found, returning no-context answer");
       await saveMessage(orgId, sessionId, "user", question);
       await saveMessage(orgId, sessionId, "assistant", NO_CONTEXT_ANSWER);
-      await logQuery({
+      logQuery({
         orgId,
         sessionId,
         question,
@@ -331,13 +348,23 @@ export async function chat(orgId: string, sessionId: string, question: string): 
       return { reply: NO_CONTEXT_ANSWER, escalated: false };
     }
 
+    // --- 5. Reranking ---
+    // Measure the time taken to rerank retrieved chunks.
+    const rerankStart = Date.now();
     const chunks = await rerankChunks(question, rawChunks);
+    const rerankMs = Date.now() - rerankStart;
+    console.log("[ragService] reranking completed", { rerankMs, chunkCount: chunks.length });
+
+    // --- 6. Answer generation ---
+    // Measure the time taken to generate the final response.
+    const answerStart = Date.now();
     const answer = await generateAnswer(question, chunks, history, supportContact);
-    console.log("[ragService] answer generated", { answerLength: answer.length });
+    const answerMs = Date.now() - answerStart;
+    console.log("[ragService] answer generated", { answerLength: answer.length, answerMs });
 
     await saveMessage(orgId, sessionId, "user", question);
     await saveMessage(orgId, sessionId, "assistant", answer);
-    await logQuery({
+    logQuery({
       orgId,
       sessionId,
       question,
