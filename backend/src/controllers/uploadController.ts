@@ -56,7 +56,7 @@ console.log("uploadFile called");
             );
 
             const response = await axios.post(
-                "http://localhost:8000/parse",
+                `${process.env.PARSER_URL}/parse`,
                 form,
                 {
                     headers: form.getHeaders(),
