@@ -13,8 +13,9 @@ import { initSocket } from './socket.js';
 import widgetConfigRouter from './routes/widgetRouter.js';
 import conversationRoutes from './routes/conversations.js';
 import settingRouter from './routes/setting.js';
-import path from 'path/win32';
+import path from 'path';
 import manageAgentsRouter from './routes/manageAgents.js';
+import { initRedis } from "./controllers/ragCache.js";
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -41,7 +42,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/widget-config', widgetConfigRouter);
 // widget testing 
-app.use(express.static(path.join(__dirname, "../public")));+
+app.use(express.static(path.join(__dirname, "../public")));
 app.use('/api/conversations',conversationRoutes);
 app.use('/api/settings', settingRouter);
 app.use('/api/manageAgents', manageAgentsRouter);
@@ -53,6 +54,11 @@ app.get('/', (req: Request, res: Response) => {
 const httpServer = createServer(app);
 initSocket(httpServer);
 
-httpServer.listen(port, () => {
-  console.log(`Backend server listening on http://localhost:${port}`);
-});
+async function startServer() {
+  await initRedis();
+  httpServer.listen(port, () => {
+    console.log(`Backend server listening on http://localhost:${port}`);
+  });
+}
+
+startServer();

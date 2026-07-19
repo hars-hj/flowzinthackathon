@@ -3,6 +3,7 @@ import { supabaseAdmin } from '../lib/supabaseClient.js';
 import { GoogleGenAI } from "@google/genai/web";
 import { getTicketBySession } from './ticket.controller.js';
 import { handleCasualQuery } from './casualQueryHandler.js';
+import { getCachedAnswer, setCachedAnswer , getSemanticCachedAnswer, setSemanticCachedAnswer} from "./ragCache.js";
 // --- Clients ---
 const embeddingsModel = new GoogleGenAI({
   apiKey: process.env.EMBEDING_API_KEY!,
@@ -309,6 +310,28 @@ export async function chat(orgId: string, sessionId: string, question: string): 
       return { reply: casual.message, escalated: false };
     }
 
+    // --- 2.5. Exact-match cache check ---
+    const cacheStart = Date.now();
+    const cachedAnswer = await getCachedAnswer(orgId, question);
+    const cacheMs = Date.now() - cacheStart;
+    console.log("[ragService] cache check completed", { cacheHit: !!cachedAnswer, cacheMs });
+
+    if (cachedAnswer) {
+      await saveMessage(orgId, sessionId, "user", question);
+      await saveMessage(orgId, sessionId, "assistant", cachedAnswer);
+      logQuery({
+        orgId,
+        sessionId,
+        question,
+        chunksRetrieved: 0,
+        topChunkScore: 0,
+        finalAnswer: cachedAnswer,
+        latencyMs: Date.now() - start,
+        escalated: false,
+      });
+      return { reply: cachedAnswer, escalated: false };
+    }
+
     // --- 3. Embedding and support lookup ---
     // Measure the time taken for embedding generation and support-contact lookup.
     const embeddingStart = Date.now();
@@ -317,10 +340,35 @@ export async function chat(orgId: string, sessionId: string, question: string): 
       getSupportContact(orgId),
     ]);
     const embeddingMs = Date.now() - embeddingStart;
+      
+
+    // --- 3.5. Semantic cache check ---
+    const semanticStart = Date.now();
+    const semanticHit = await getSemanticCachedAnswer(orgId, queryEmbedding);
+    const semanticMs = Date.now() - semanticStart;
+    console.log("[ragService] semantic cache check completed", { hit: !!semanticHit, score: semanticHit?.score, semanticMs });
+
+    if (semanticHit) {
+      await saveMessage(orgId, sessionId, "user", question);
+      await saveMessage(orgId, sessionId, "assistant", semanticHit.answer);
+      logQuery({
+        orgId,
+        sessionId,
+        question,
+        chunksRetrieved: 0,
+        topChunkScore: semanticHit.score,
+        finalAnswer: semanticHit.answer,
+        latencyMs: Date.now() - start,
+        escalated: false,
+      });
+      return { reply: semanticHit.answer, escalated: false };
+    }
+
+
 
     console.log("[ragService] embedding and support contact resolved", { supportContact, embeddingMs });
     const keywords = question.split(" ").slice(0, 6).join(" | ");
-
+     
     // --- 4. Retrieval and history lookup ---
     // Measure the time taken for chunk retrieval and conversation-history lookup.
     const retrievalStart = Date.now();
@@ -362,6 +410,10 @@ export async function chat(orgId: string, sessionId: string, question: string): 
     const answerMs = Date.now() - answerStart;
     console.log("[ragService] answer generated", { answerLength: answer.length, answerMs });
 
+  // cache the answer in both exact-match and semantic caches for future queries
+    await setCachedAnswer(orgId, question, answer); // 
+     await setSemanticCachedAnswer(orgId, question, queryEmbedding, answer);
+
     await saveMessage(orgId, sessionId, "user", question);
     await saveMessage(orgId, sessionId, "assistant", answer);
     logQuery({
@@ -372,7 +424,7 @@ export async function chat(orgId: string, sessionId: string, question: string): 
       topChunkScore: chunks[0]?.similarity ?? 0,
       finalAnswer: answer,
       latencyMs: Date.now() - start,
-      escalated: false, // TODO: wire in your escalation-detection model's result here
+      escalated: false, 
     });
 
     console.log("[ragService] chat completed", { latencyMs: Date.now() - start, escalated: false });
