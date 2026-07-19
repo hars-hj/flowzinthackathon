@@ -17,7 +17,7 @@ export function TicketChatPanel({ ticket, currentUser, onBack }: TicketChatPanel
   const [loading, setLoading] = useState(true)
   const [resolving, setResolving] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
-  const [historyCount, setHistoryCount] = useState(0)
+  //const [historyCount, setHistoryCount] = useState(0)
   const role = currentUser?.role ?? 'agent'
 
   const load = useCallback(async () => {
@@ -44,7 +44,7 @@ export function TicketChatPanel({ ticket, currentUser, onBack }: TicketChatPanel
         (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       )
 
-      setHistoryCount(history.length)
+     // setHistoryCount(history.length)
       setMessages(merged)
     } catch (err) {
       console.error('Failed to load messages:', err)

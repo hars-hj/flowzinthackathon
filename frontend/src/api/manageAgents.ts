@@ -12,6 +12,11 @@ export async function getAgents(): Promise<Agent[]> {
   })
 }
 
+export async function getAgentscount(): Promise<number> {
+  const agents = await getAgents()
+  return agents.length
+}
+
 export async function createAgent(payload: { email: string; password: string }): Promise<Agent> {
   return apiFetch<Agent>('/api/manageAgents', {
     method: 'POST',

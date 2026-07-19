@@ -170,11 +170,11 @@ export function AnalyticsPage() {
   const [logs, setLogs] = useState<QueryLog[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [refreshing, setRefreshing] = useState(false)
+  //const [refreshing, setRefreshing] = useState(false)
 
   const load = useCallback(async (silent = false) => {
   if (!silent) setLoading(true)
-  else setRefreshing(true)
+  //else setRefreshing(true)
   setError('')
   try {
     const analyticsData = await apiFetch<AnalyticsData>('/api/chat/analytics')
@@ -184,7 +184,7 @@ export function AnalyticsPage() {
     setError(e instanceof Error ? e.message : 'Something went wrong')
   } finally {
     setLoading(false)
-    setRefreshing(false)
+    //setRefreshing(false)
   }
 }, [])
 

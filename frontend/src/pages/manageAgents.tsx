@@ -43,6 +43,7 @@ export function AgentsPage() {
     try {
       const data = await getAgents()
       setAgents(data)
+    //  console.log('Agents loaded:', data)
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Failed to load agents')
     } finally {
