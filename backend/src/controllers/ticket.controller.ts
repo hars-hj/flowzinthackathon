@@ -1,6 +1,5 @@
 import { supabaseAdmin } from '../lib/supabaseClient.js';
 
-
 export async function createTicket(orgId: string, sessionId: string, userQuestion: string, email?: string) {
   const { data, error } = await supabaseAdmin
     .from('support_tickets')
@@ -8,6 +7,29 @@ export async function createTicket(orgId: string, sessionId: string, userQuestio
     .select()
     .single();
   if (error) throw error;
+
+  // Mark the most recent query_log for this session as escalated.
+  // Best-effort: a failure here shouldn't block ticket creation.
+  try {
+    const { data: latestLog } = await supabaseAdmin
+      .from('query_logs')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (latestLog) {
+      await supabaseAdmin
+        .from('query_logs')
+        .update({ escalated: true })
+        .eq('id', latestLog.id);
+    }
+  } catch (err) {
+    console.error('[ticket.controller] failed to mark query_log as escalated:', err);
+  }
+
   return data;
 }
 
