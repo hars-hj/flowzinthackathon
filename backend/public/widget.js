@@ -8,7 +8,10 @@
     return;
   }
 
-  const BASE_URL = 'http://localhost:4000'; // Replace with actual backend URL
+  // Derive the backend URL from wherever this script itself was loaded from.
+  // Works automatically in dev (localhost) and prod (your Railway domain)
+  // without any hardcoding or rebuild.
+  const BASE_URL = new URL(scriptTag.src).origin;
 
   // 2. Fetch widget config (theme, position, etc.) before rendering anything
   fetch(`${BASE_URL}/api/widget-config?key=${orgKey}`)

@@ -7,7 +7,7 @@ It combines:
 - a React frontend for authentication, chat sessions, and admin document upload
 - an Express backend for auth, chat, and file ingestion
 - a Python parser service to extract text from uploaded PDFs
-- a RAG (Retrieval-Augmented Generation) pipeline using embeddings and LLM chat completion
+- a RAG (Retrieval-Augmented Generation) pipeline using embeddings and LLM chat completion, with a Redis-backed response cache to cut latency and LLM/embedding costs on repeated or near-duplicate questions
 - a multi-tenant organization model, where each admin account creates and owns an organization with its own widget key, widget configuration, and agents
 - an embeddable chat widget (separate React app, served in an iframe) that anonymous end-users interact with on a client's website, with session-based identity and optional email capture
 - a human-in-the-loop support ticket system, with a live WebSocket handoff between the widget and dedicated agent/admin dashboards
@@ -19,6 +19,7 @@ It combines:
 - Sets up an Express server on port `4000`
 - Enables CORS for `http://localhost:5173` (admin/agent frontend) and for widget-facing routes (public, `origin: '*'`, since those are called from arbitrary customer websites)
 - Initializes Socket.IO on the same HTTP server (`initSocket(httpServer)`), **not** via `app.listen()` — sockets require the raw `http.Server` instance
+- Connects to Redis (`initRedis()`) before the HTTP server starts listening, so no request can hit the RAG pipeline before the cache is available
 - Mounts API routers:
   - `/api/auth` for authentication
   - `/api/chat` for chatbot queries (authenticated, logged-in dashboard chat) **and** widget chat (public, `widget_key`-scoped)
@@ -59,7 +60,7 @@ It combines:
   3. Sets `profiles.role` to `admin`
   4. Inserts an `organization_members` row linking the new user to the new org with `role: 'admin'`
   5. If any step after org creation fails, the organization row is rolled back to avoid orphaned orgs
-- Every other org-scoped resource (widget config, agents, widget key, tickets, chunks, conversations) is looked up through the caller's `organization_members` row (for authenticated dashboard requests) or resolved server-side from the request's `widget_key` (for public widget requests) — never trusted from a client-supplied `org_id` parameter directly.
+- Every other org-scoped resource (widget config, agents, widget key, tickets, chunks, conversations, cached responses) is looked up through the caller's `organization_members` row (for authenticated dashboard requests) or resolved server-side from the request's `widget_key` (for public widget requests) — never trusted from a client-supplied `org_id` parameter directly.
 
 ### Settings and widget configuration
 - `backend/src/routes/settingsRouter.ts` → mounted at `/api/settings`
@@ -96,6 +97,7 @@ It combines:
 - `backend/src/routes/chatRoutes.ts`
 - `backend/src/controllers/chatbotController.ts` — handles **both** the authenticated dashboard chat and the public widget chat, routing internally between RAG, casual-query shortcuts, and open-ticket handoff (see **Escalation and support tickets** below)
 - `backend/src/controllers/ragService.ts`
+- `backend/src/controllers/ragCache.ts` — Redis-backed response cache, scoped per `org_id` so no organization's cached answer can ever be served to another (see **Response caching** below)
 - Dashboard chat endpoints (authenticated via JWT):
   - `GET /api/chat/sessions` — loads the current user's chat sessions and message history
   - `DELETE /api/chat/:sessionId` — deletes the session conversation history and removes the `user_session` link for the authenticated user
@@ -103,18 +105,29 @@ It combines:
 - Widget chat endpoint (public, `widget_key`-scoped):
   - `POST /api/chat` — accepts `{ widget_key, session_id, message }`. Resolves `org_id` from `widget_key`, then branches:
     1. **If the session has an open ticket** (`status` = `waiting` or `in_progress`) — the message is saved to `ticket_messages` and broadcast to the agent via WebSocket; the RAG pipeline is skipped entirely.
-    2. **Else if it matches a casual-query pattern** (greetings, thanks, etc.) — a canned reply is returned without invoking retrieval or the LLM.
-    3. **Else** — the full RAG flow runs (embed → hybrid retrieve → rerank → generate), scoped to the resolved `org_id`.
+    2. **Else if it matches a casual-query pattern** (greetings, thanks, etc.) — a canned reply is returned without invoking retrieval, caching, or the LLM.
+    3. **Else** — the full RAG flow runs (cache check → embed → semantic cache check → hybrid retrieve → rerank → generate), scoped to the resolved `org_id`.
   - Returns `{ reply, sessionId, mode: 'ticket' | 'bot', ticketId?, escalated? }`
 - RAG chat flow, org-scoped:
-  1. Backend embeds the user query using Google GenAI (`gemini-embedding-001`)
-  2. Supabase vector search RPC `match_chunks` (now takes a `p_org_id` parameter) retrieves top matching document chunks **for that org only**, combined with keyword full-text search via Reciprocal Rank Fusion
-  3. Chunks are reranked using a lightweight LLM relevance scoring pass
-  4. Conversation history for the session is loaded from `conversations`, scoped by `org_id` + `session_id`
-  5. A system prompt is built with retrieved context (referencing the org's configured `support_email` for the "I don't have that detail" fallback line) and sent to Groq LLM chat completion
-  6. Answer is returned and both question and response are saved to `conversations`
-  7. Query metrics are logged to `query_logs` (`org_id`, latency, chunks retrieved, top score)
+  1. **Exact-match cache check** — the incoming question is normalized and hashed; if an identical question was answered for this org within the cache TTL, the cached answer is returned immediately and steps 2–7 below are skipped entirely.
+  2. Backend embeds the user query using Google GenAI (`gemini-embedding-001`)
+  3. **Semantic cache check** — the query embedding is compared (cosine similarity) against recently cached question embeddings for this org; a close-enough match (above a tuned similarity threshold) returns the cached answer, skipping retrieval, reranking, and generation
+  4. Supabase vector search RPC `match_chunks` (takes a `p_org_id` parameter) retrieves top matching document chunks **for that org only**, combined with keyword full-text search via Reciprocal Rank Fusion
+  5. Chunks are reranked using a lightweight LLM relevance scoring pass
+  6. Conversation history for the session is loaded from `conversations`, scoped by `org_id` + `session_id`
+  7. A system prompt is built with retrieved context (referencing the org's configured `support_email` for the "I don't have that detail" fallback line) and sent to Groq LLM chat completion
+  8. The generated answer is written to both the exact-match and semantic caches (keyed to this org) before being returned, so future identical or near-duplicate questions from any user of this org can be served from cache
+  9. Answer is returned and both question and response are saved to `conversations`
+  10. Query metrics are logged to `query_logs` (`org_id`, latency, chunks retrieved, top score)
 - If no relevant chunks are found, the bot returns a fallback answer directing the user to contact support, and this event is treated as a signal that escalation (via the "Talk to a human" flow) may be appropriate — though escalation itself remains **user-initiated**, not automatically triggered (see below).
+
+#### Response caching
+- Implemented in `backend/src/controllers/ragCache.ts`, backed by Redis (Upstash in production/dev, or any Redis-compatible instance via `REDIS_URL`).
+- **Exact-match cache**: keyed on `org_id` + a SHA-256 hash of the normalized question. Cheapest possible check — no embedding call required — so it's checked first, before any embedding or retrieval work happens.
+- **Semantic cache**: keyed per `org_id`, storing recent `{ question, embedding, answer }` triples. A new query's embedding (already computed for retrieval, so this adds no extra embedding calls beyond the one retrieval needs) is compared via cosine similarity against cached entries; a hit above the similarity threshold returns the cached answer without running retrieval, reranking, or LLM generation.
+- Both caches are scoped per organization — an org's cached answers are never visible to or reused by another org, matching the multi-tenant isolation used everywhere else in the backend.
+- Cache entries expire automatically (TTL-based); there is no manual cache invalidation. Re-uploading or changing an org's knowledge base does not currently purge its existing cache entries, so stale answers can persist until TTL expiry — worth keeping in mind when testing changes to uploaded documents.
+- Purpose: reduce latency and cost on repeated or near-duplicate questions, which are common in a support-chatbot setting (e.g. "how do I cancel a trip" vs. "how can I cancel my trip").
 
 ### Escalation and support tickets
 Escalation in this system is **explicitly triggered by the end-user clicking "Talk to a human" in the widget** — there is no AI-based escalation-intent detection model. This keeps escalation latency-free (no extra LLM call in the chat path) and gives the user direct control over when to leave the bot.
@@ -150,12 +163,14 @@ Escalation in this system is **explicitly triggered by the end-user clicking "Ta
 ### External services and environment
 - Uses Supabase with both anonymous and service-role clients
 - Uses Google GenAI for embeddings and Groq for chat completions
+- Uses Redis (e.g. Upstash) for exact-match and semantic response caching
 - Requires environment variables like:
   - `SUPABASE_URL`
   - `SUPABASE_SERVICE_ROLE_KEY`
   - `SUPABASE_ANON_KEY`
   - `EMBEDING_API_KEY`
   - `GROQ_API_KEY`
+  - `REDIS_URL` — Redis connection string (e.g. `rediss://default:<password>@<host>:6379` for TLS-enabled providers like Upstash)
 - `ADMIN_REGISTRATION_SECRET` is no longer used now that admin signup creates an organization directly instead of being gated by a shared secret.
 
 ## Parser service (`parser-service/`)
@@ -250,7 +265,7 @@ A separate, standalone React + Vite app, deployed independently and rendered ins
 4. The admin visits Settings to copy the install script tag (containing their `widget_key`) onto their site, and optionally customizes widget behavior (bot name, colors, welcome message, quick questions, support email, etc.) via widget configuration.
 5. The admin creates agent accounts from the admin panel (email + password chosen by the admin); agents are added to the organization with an `agent` role for handling tickets. **Agents log in at the same `/login` page using the credentials the admin created for them** — there is no separate agent signup flow.
 6. A visitor on the customer's website opens the embedded widget; a `session_id` is generated and stored locally, and the widget loads any existing bot/ticket history for that session.
-7. The visitor asks questions; each message is answered by the RAG pipeline, scoped to the organization's own documents, unless a support ticket is already open for that session (in which case messages route to the live agent conversation instead).
+7. The visitor asks questions; each question first checks the org-scoped Redis cache (exact match, then semantic match) — a hit returns instantly with no embedding, retrieval, or LLM call. On a miss, the question is answered by the RAG pipeline, scoped to the organization's own documents, unless a support ticket is already open for that session (in which case messages route to the live agent conversation instead). Generated answers are written back to the cache for future reuse.
 8. If the bot can't help, the visitor can click "Talk to a human," optionally providing an email, which creates a `support_tickets` row and notifies all connected agents/admins live via WebSocket.
 9. An agent or admin claims the ticket from their dashboard (claim is atomic at the DB level, preventing double-claims); the ticket moves to their Active tab, and they see the full pre-escalation bot conversation plus the live ticket thread.
 10. The agent and the widget user exchange messages in real time over the `ticket_<id>` WebSocket room.
@@ -264,4 +279,5 @@ A separate, standalone React + Vite app, deployed independently and rendered ins
 - The backend enforces admin-only access for uploading and listing files, managing settings/widget configuration, regenerating the widget key, and creating agent accounts. Agent accounts, once created by an admin, have their own authenticated access to the ticket dashboards and endpoints, scoped to their org.
 - Every admin/agent-scoped backend endpoint resolves the organization from the authenticated caller's `organization_members` row rather than trusting a client-supplied org id; every widget-facing endpoint resolves the organization from the request's `widget_key` rather than trusting a client-supplied org id. Neither ever trusts an `org_id` sent directly by the client.
 - Escalation to a human agent is user-initiated only (a "Talk to a human" action in the widget) — there is no automated escalation-intent detection model in the chat pipeline, keeping the RAG response path free of extra latency.
+- The RAG response cache (exact-match + semantic, Redis-backed, per-org) reduces latency and LLM/embedding cost on repeated or near-duplicate questions; it has no manual invalidation, so cache entries persist until TTL expiry even after the underlying knowledge base changes.
 - The core value is a document-powered chatbot that can answer questions from uploaded PDF knowledge bases, deployed per-organization via an embeddable widget, with a live human-agent fallback when the bot can't help.

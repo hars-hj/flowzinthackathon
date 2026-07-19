@@ -35,6 +35,8 @@ export function SettingsPage() {
   // const navigate = useNavigate()
   const { user } = useAuth()
 
+  const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
   const [org, setOrg] = useState<Organization | null>(null)
   const [config, setConfig] = useState(DEFAULT_CONFIG)
   const [quickQuestionInput, setQuickQuestionInput] = useState('')
@@ -128,7 +130,9 @@ export function SettingsPage() {
 
   async function handleCopySnippet() {
     if (!org) return
-    const snippet = `<script src="https://cdn.nexasupport.com/widget.js" data-widget-key="${org.widget_key}"></script>`
+
+
+    const snippet = `<script src="${backendUrl}/widget.js" data-widget-key="${org.widget_key}"></script>`;
     await navigator.clipboard.writeText(snippet)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -188,7 +192,7 @@ export function SettingsPage() {
 
               <div className="mb-4 rounded-lg border border-border bg-surface-muted px-4 py-3">
                 <code className="break-all font-mono text-xs text-text-primary">
-                  {`<script src="https://cdn.nexasupport.com/widget.js" data-org="${org?.widget_key ?? ''}"></script>`}
+                  {`<script src="${backendUrl}/widget.js" data-org="${org?.widget_key ?? ''}"></script>`}
                 </code>
               </div>
 
